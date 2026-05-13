@@ -7,10 +7,11 @@ import "encoding/binary"
 var efMarker = [6]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0xEF}
 
 // MinEFSize is the smallest viable EF payload:
-//   4 (version) + 6 (marker) + 1 (vin_count) +
-//   32+4+1+4+8+1 (EF input with empty script and 0 satoshis) +
-//   1 (vout_count) + 8+1 (output value + script_len=0) +
-//   4 (locktime) = 75 bytes.
+//
+//	4 (version) + 6 (marker) + 1 (vin_count) +
+//	32+4+1+4+8+1 (EF input with empty script and 0 satoshis) +
+//	1 (vout_count) + 8+1 (output value + script_len=0) +
+//	4 (locktime) = 75 bytes.
 //
 // Build pads or grows the output script when targetSize exceeds the minimum.
 const MinEFSize = 75
