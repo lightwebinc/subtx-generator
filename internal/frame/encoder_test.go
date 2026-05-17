@@ -12,7 +12,7 @@ func TestEncodeV2Roundtrip(t *testing.T) {
 	for i := 0; i < 32; i++ {
 		f.TxID[i] = byte(i)
 	}
-	f.CurSeq = 42
+	f.SeqNum = 42
 	buf := make([]byte, HeaderSize(V2)+len(f.Payload))
 	n, err := Encode(V2, f, buf)
 	if err != nil {
@@ -25,8 +25,8 @@ func TestEncodeV2Roundtrip(t *testing.T) {
 	if got.Version != common.FrameVerV2 {
 		t.Errorf("version: got %d want brc122", got.Version)
 	}
-	if got.CurSeq != 42 {
-		t.Errorf("CurSeq mismatch: got %d want 42", got.CurSeq)
+	if got.SeqNum != 42 {
+		t.Errorf("SeqNum mismatch: got %d want 42", got.SeqNum)
 	}
 	if !bytes.Equal(got.Payload, f.Payload) {
 		t.Errorf("payload mismatch")
@@ -53,7 +53,7 @@ func TestEncodeV1Roundtrip(t *testing.T) {
 	if got.Version != common.FrameVerV1 {
 		t.Errorf("version: got %d want v1", got.Version)
 	}
-	if got.CurSeq != 0 || got.PrevSeq != 0 || got.SubtreeID != [32]byte{} {
+	if got.SeqNum != 0 || got.HashKey != 0 || got.SubtreeID != [32]byte{} {
 		t.Errorf("v1 should zero v2-only fields")
 	}
 	if !bytes.Equal(got.Payload, f.Payload) {
