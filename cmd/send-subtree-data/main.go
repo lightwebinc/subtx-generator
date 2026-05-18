@@ -44,6 +44,8 @@ func main() {
 	nodeCount := flag.Int("nodes", 16, "number of subtree nodes per frame")
 	payloadSize := flag.Int("payload-size", 0,
 		"override total payload size in bytes (0 = derived from nodes × node-size)")
+	subtreeCount := flag.Int("subtree-count", 0,
+		"number of unique subtree IDs to cycle through (0 = one fresh random ID per frame)")
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")
 	flag.Parse()
 
@@ -68,6 +70,15 @@ func main() {
 		payLen = nodeSize
 	}
 
+	// Pre-generate the subtree ID pool when -subtree-count > 0.
+	var subtreePool [][32]byte
+	if *subtreeCount > 0 {
+		subtreePool = make([][32]byte, *subtreeCount)
+		for i := range subtreePool {
+			mustRand(subtreePool[i][:])
+		}
+	}
+
 	conn, err := net.DialTimeout("tcp", *addr, 5*time.Second)
 	if err != nil {
 		log.Fatalf("dial %s: %v", *addr, err)
@@ -78,9 +89,14 @@ func main() {
 
 	sent := 0
 	for i := 0; i < *frameCount; i++ {
-		// Random SubtreeID (Merkle root — not SHA256d of payload for V5).
+		// SubtreeID: cycle through the pool when -subtree-count is set,
+		// otherwise generate a fresh random ID per frame.
 		var subtreeID [32]byte
-		mustRand(subtreeID[:])
+		if len(subtreePool) > 0 {
+			subtreeID = subtreePool[i%len(subtreePool)]
+		} else {
+			mustRand(subtreeID[:])
+		}
 
 		// Random payload (node hashes or full-node records).
 		payload := make([]byte, payLen)
