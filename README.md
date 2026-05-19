@@ -129,15 +129,19 @@ subtx-gen -subtrees 8 -subtree-seed 'multicast-lab-bsv' -print-subtrees
 ## Layout
 
 ```
-cmd/subtx-gen/        — CLI entrypoint
-internal/tx/          — random BSV-shaped tx payload builder
-internal/subtree/     — deterministic subtree-ID pool
-internal/seq/         — shared seq allocator + gap injector
-internal/frame/       — v1/v2 encoder wrapper around bitcoin-shard-common
-internal/rate/        — token-bucket pacer (smooth / burst)
-internal/sender/      — worker pool driving net.UDPConn per worker
-internal/announce/     — BRC-127 SubtreeAnnounce TCP sender
+cmd/subtx-gen/            — CLI entry point (BRC-124/128 frame generator)
+cmd/send-block-announce/  — BRC-131 block announce sender (TCP)
+cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP)
+internal/tx/              — random BSV-shaped tx payload builder
+internal/subtree/         — deterministic subtree-ID pool
+internal/seq/             — shared seq allocator + gap injector
+internal/frame/           — v1/v2 encoder wrapper around bitcoin-shard-common
+internal/rate/            — token-bucket pacer (smooth / burst)
+internal/sender/          — worker pool driving net.UDPConn per worker
+internal/announce/        — BRC-127 SubtreeAnnounce TCP sender
 ```
+
+See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.
 
 ## License
 
