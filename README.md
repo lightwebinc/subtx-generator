@@ -50,7 +50,7 @@ subtx-gen \
   -frame-version 2 \
   -shard-bits 2 \
   -subtrees 8 \
-  -subtree-seed 'lax-lab-2026' \
+  -subtree-seed 'multicast-lab-bsv' \
   -pps 1000 \
   -duration 10s \
   -payload-size 512 \
@@ -78,7 +78,7 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 subtx-gen \
   -addr [fd20::2]:9000 \
   -subtrees 8 \
-  -subtree-seed 'lax-lab-2026' \
+  -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
   -announce-addr [fd20::2]:9002 \
   -announce-interval 10s \
@@ -101,7 +101,7 @@ subtrees. This produces a visible ramp in dashboard time-series and is used by
 subtx-gen \
   -addr [fd20::2]:9000 \
   -subtrees 8 \
-  -subtree-seed 'lax-lab-2026' \
+  -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
   -announce-addr [fd20::2]:9002 \
   -announce-interval 12s \
@@ -123,7 +123,7 @@ subtx-gen \
 ### Inspect the generated subtree pool
 
 ```bash
-subtx-gen -subtrees 8 -subtree-seed 'lax-lab-2026' -print-subtrees
+subtx-gen -subtrees 8 -subtree-seed 'multicast-lab-bsv' -print-subtrees
 ```
 
 ## Layout
