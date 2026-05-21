@@ -7,8 +7,9 @@ It generates random BRC-124/BRC-128 UDP frames at configurable rates, with contr
 subtree ID assignment and optional sequence gap injection to exercise the NACK/retransmission
 path of `bitcoin-shard-listener` and `bitcoin-retry-endpoint`.
 
-It also provides two standalone tools (`send-block-announce` and `send-subtree-data`) for
-injecting BRC-131 and BRC-132 control-plane frames into `bitcoin-shard-proxy` via TCP.
+It also provides three standalone tools — `send-block-announce`, `send-subtree-data`, and
+`send-anchor-frame` — for injecting BRC-131, BRC-132, and BRC-134 control-plane frames into
+`bitcoin-shard-proxy` via TCP.
 
 `bitcoin-subtx-generator` is a **test tool, not a production component**. It sends frames
 only; it never joins multicast groups or receives frames.
@@ -30,6 +31,11 @@ bitcoin-subtx-generator (send-subtree-data)
       │  BRC-132 frames (TCP, port 9002)
       ▼
 bitcoin-shard-proxy  ──CtrlGroupSubtreeAnnounce──►  bitcoin-shard-listener
+
+bitcoin-subtx-generator (send-anchor-frame)
+      │  BRC-134 frames (TCP, port 9002)
+      ▼
+bitcoin-shard-proxy  ──CtrlGroupControl──►  bitcoin-shard-listener
 ```
 
 ## Package Structure
@@ -39,6 +45,7 @@ bitcoin-subtx-generator/
   cmd/subtx-gen/           CLI entry point for the BRC-124/128 frame generator
   cmd/send-block-announce/ Standalone BRC-131 sender (BlockAnnounce + CoinbaseTx pairs)
   cmd/send-subtree-data/   Standalone BRC-132 sender (subtree node data)
+  cmd/send-anchor-frame/   Standalone BRC-134 sender (anchor transaction chain root)
   internal/tx/             Random BSV-shaped transaction payload builder
   internal/subtree/        Deterministic subtree-ID pool (seed → N stable 32-byte IDs)
   internal/seq/            Shared atomic sequence allocator with gap injection
@@ -123,3 +130,15 @@ cycled frame-by-frame. When zero, a fresh random SubtreeID is used per frame.
 
 `HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
 `processSubtreeDataFrame` path and BRC-132 fragment reassembly.
+
+## send-anchor-frame
+
+`send-anchor-frame` connects to the proxy TCP ingress and sends BRC-134 anchor transaction
+frames (`FrameVerV6`). Anchor frames carry a chain root and are routed to `CtrlGroupControl`
+by the proxy, with HashKey derived against the virtual `groupIdx = 0xFFF9` for independent
+flow accounting (label `brc134`).
+
+`HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
+`processAnchorFrame` path and the retry-endpoint anchor cache + retransmit flow. Used by
+integration scenarios 36 (delivery) and 37 (retransmit) in `bitcoin-multicast-test`. See
+[bitcoin-multicast/docs/brc-134-anchor-transactions.md](../../../bitcoin-multicast/docs/brc-134-anchor-transactions.md).
