@@ -93,7 +93,7 @@ the group incrementally. The sender starts with zero active subtrees and adds
 `phase-size` more every `phase-interval`, up to the full pool. The re-announce
 ticker (`-announce-interval`) continues to fire to refresh TTLs of already-active
 subtrees. This produces a visible ramp in dashboard time-series and is used by
-[scenario 21](https://github.com/lightwebinc/bitcoin-multicast-test/tree/main/scenarios/21-subtree-group-ramp).
+[scenario 21](https://github.com/lightwebinc/bitcoin-multicast-test/tree/main/vm-lab/scenarios/21-subtree-group-ramp).
 
 ```bash
 # Announce 1 new subtree every 75s (8 subtrees → full coverage after ~10 min).
