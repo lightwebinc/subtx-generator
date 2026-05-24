@@ -144,6 +144,20 @@ internal/announce/        — BRC-127 SubtreeAnnounce TCP sender
 
 See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.
 
+## Helm chart
+
+A Kubernetes Helm chart is published from a dedicated chart repository:
+
+- Repository: [`lightwebinc/bitcoin-subtx-generator-helm`](https://github.com/lightwebinc/bitcoin-subtx-generator-helm)
+- HTTPS:
+  ```
+  helm repo add bsg https://lightwebinc.github.io/bitcoin-subtx-generator-helm
+  helm install gen bsg/bitcoin-subtx-generator --set mode=subtx-gen
+  ```
+- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/bitcoin-subtx-generator --version 0.1.0`
+
+The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (`subtx-gen` | `send-anchor-frame` | `send-block-announce` | `send-subtree-data`). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
