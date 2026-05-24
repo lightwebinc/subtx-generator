@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -6,33 +6,30 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  ci:
+    name: ci (dagger)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout subtx-generator
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           path: bitcoin-subtx-generator
-      - name: Checkout shard-common (replace target)
-        uses: actions/checkout@v4
+
+      - uses: actions/checkout@v6
         with:
           repository: lightwebinc/bitcoin-shard-common
           path: bitcoin-shard-common
-      - uses: actions/setup-go@v5
+
+      - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
-      - name: Test
+          go-version-file: bitcoin-subtx-generator/go.mod
+          cache: false
+
+      - name: Run Dagger pipeline
         working-directory: bitcoin-subtx-generator
-        run: |
-          go mod tidy
-          go build ./...
-          go test -race -count=1 ./...
-      - name: Lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: latest
-          working-directory: bitcoin-subtx-generator
+        env:
+          GOWORK: "off"
+        run: make ci

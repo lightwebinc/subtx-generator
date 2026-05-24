@@ -144,6 +144,24 @@ internal/announce/        — BRC-127 SubtreeAnnounce TCP sender
 
 See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.
 
+## Container image
+
+The Dockerfile produces a single `gcr.io/distroless/static:nonroot` image
+containing all four binaries:
+
+```
+/usr/local/bin/subtx-gen             (continuous BRC-124/BRC-128 frame generator)
+/usr/local/bin/send-anchor-frame     (one-shot BRC-134 anchor)
+/usr/local/bin/send-block-announce   (one-shot BRC-131 announce)
+/usr/local/bin/send-subtree-data     (one-shot BRC-127 subtree-data)
+```
+
+**No `ENTRYPOINT` is set** — the consumer (Helm chart `mode` selector,
+`docker run --entrypoint=…`, Kubernetes `command:` field) picks which binary
+to invoke. Running the image without an explicit entrypoint will fail. The
+[`bitcoin-subtx-generator-helm`](https://github.com/lightwebinc/bitcoin-subtx-generator-helm)
+chart automates this via `.Values.mode`.
+
 ## Helm chart
 
 A Kubernetes Helm chart is published from a dedicated chart repository:
