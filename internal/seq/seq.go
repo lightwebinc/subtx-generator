@@ -108,6 +108,14 @@ func (a *Allocator) DueRetransmits(now time.Time) []uint64 {
 	return due
 }
 
+// GapEnabled reports whether gap injection is active (GapEvery > 0 and GapSize > 0).
+// When true, callers should pre-stamp the frame's SeqNum with the value returned
+// by Next() so the proxy passes the frame through verbatim; the gaps in the
+// sequence are the desired missing frames at the listener.
+func (a *Allocator) GapEnabled() bool {
+	return a.gapEvery != 0 && a.gapSize != 0
+}
+
 // Pending returns the number of gap groups still awaiting retransmission.
 func (a *Allocator) Pending() int {
 	a.mu.Lock()

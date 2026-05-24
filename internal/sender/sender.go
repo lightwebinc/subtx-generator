@@ -234,8 +234,15 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			}
 		}
 
-		// Drive gap injection (alloc.Next may sleep to simulate gaps).
-		r.alloc.Next()
+		// Advance the gap allocator. When gap injection is enabled, pre-stamp
+		// f.SeqNum with the returned value so the proxy passes the frame through
+		// verbatim (SeqNum!=0 skips proxy stamping). The gaps in the sequence
+		// are the permanently-missing frames the listener must NACK for.
+		// When gap injection is disabled, leave f.SeqNum=0 so the proxy stamps
+		// per-flow monotonic SeqNums as normal.
+		if seqNum := r.alloc.Next(); r.alloc.GapEnabled() {
+			f.SeqNum = seqNum
+		}
 
 		// SubtreeID chosen by txid high bits so listeners filtering on a
 		// single subtree see a predictable fraction of traffic.
