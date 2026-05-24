@@ -138,6 +138,7 @@ func main() {
 		PayloadFormat:   pf,
 		LogInterval:     *logInterval,
 		CorruptTxIDRate: *corruptTxIDRate,
+		ShardBits:       *shardBits,
 	}, pool, alloc)
 
 	// Start announce goroutine if configured.

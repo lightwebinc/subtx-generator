@@ -116,9 +116,64 @@ func (a *Allocator) GapEnabled() bool {
 	return a.gapEvery != 0 && a.gapSize != 0
 }
 
+// GapConfig returns the underlying gap-injection configuration. Useful for
+// constructing a [PerFlowAllocator] that mirrors a global [Allocator]'s
+// pattern on a per-flow basis.
+func (a *Allocator) GapConfig() Config {
+	return Config{GapEvery: a.gapEvery, GapSize: a.gapSize, GapDelay: a.gapDelay}
+}
+
 // Pending returns the number of gap groups still awaiting retransmission.
 func (a *Allocator) Pending() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return len(a.pending)
+}
+
+// FlowKey identifies a (groupIdx, subtreeID) flow for per-flow sequence
+// allocation in [PerFlowAllocator].
+type FlowKey struct {
+	GroupIdx  uint32
+	SubtreeID [32]byte
+}
+
+// PerFlowAllocator hands out monotonically-increasing per-flow sequence
+// numbers, with optional per-flow gap injection. It is intended for use with
+// the proxy's per-(sender, group, subtree) flow counter so the sender can
+// pre-stamp SeqNum values that match what the proxy would otherwise stamp,
+// while still injecting deterministic gaps in each individual flow.
+//
+// Each distinct FlowKey lazily gets its own underlying [Allocator] sharing
+// the same Config (Start/GapEvery/GapSize/GapDelay).
+type PerFlowAllocator struct {
+	cfg Config
+
+	mu     sync.Mutex
+	allocs map[FlowKey]*Allocator
+}
+
+// NewPerFlow returns a new PerFlowAllocator using cfg for every flow.
+func NewPerFlow(cfg Config) *PerFlowAllocator {
+	return &PerFlowAllocator{
+		cfg:    cfg,
+		allocs: make(map[FlowKey]*Allocator),
+	}
+}
+
+// Next returns the next sequence number for the given flow, creating a new
+// underlying [Allocator] for the flow on first use.
+func (p *PerFlowAllocator) Next(k FlowKey) uint64 {
+	p.mu.Lock()
+	a, ok := p.allocs[k]
+	if !ok {
+		a = New(p.cfg)
+		p.allocs[k] = a
+	}
+	p.mu.Unlock()
+	return a.Next()
+}
+
+// GapEnabled reports whether gap injection is active for this allocator.
+func (p *PerFlowAllocator) GapEnabled() bool {
+	return p.cfg.GapEvery != 0 && p.cfg.GapSize != 0
 }

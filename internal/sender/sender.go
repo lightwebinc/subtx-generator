@@ -74,6 +74,7 @@ type Config struct {
 	PayloadFormat   PayloadFormat
 	LogInterval     time.Duration
 	CorruptTxIDRate uint // percentage of frames to corrupt TxID (0-100)
+	ShardBits       uint // proxy shard-bits; used to compute per-flow groupIdx for gap injection
 }
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
@@ -81,6 +82,7 @@ type Runner struct {
 	cfg   Config
 	pool  *subtree.Pool
 	alloc *seq.Allocator
+	pfa   *seq.PerFlowAllocator // active when GapEnabled to inject per-flow gaps
 
 	sent   atomic.Uint64
 	bytes  atomic.Uint64
@@ -98,7 +100,32 @@ func New(cfg Config, pool *subtree.Pool, alloc *seq.Allocator) *Runner {
 	if cfg.LogInterval <= 0 {
 		cfg.LogInterval = time.Second
 	}
-	return &Runner{cfg: cfg, pool: pool, alloc: alloc}
+	r := &Runner{cfg: cfg, pool: pool, alloc: alloc}
+	// When gap injection is enabled we issue SeqNums per (groupIdx, subtreeID)
+	// flow so each flow has its own monotonic counter with deliberate gaps.
+	// This mirrors the proxy's per-flow stamping, allowing the listener's
+	// per-flow gap tracker to detect the injected gaps without false positives
+	// from cross-flow sequence sparsity.
+	if alloc != nil && alloc.GapEnabled() {
+		gc := alloc.GapConfig()
+		gc.Start = 1
+		r.pfa = seq.NewPerFlow(gc)
+	}
+	return r
+}
+
+// groupIdx returns the shard group index for txid given the configured
+// ShardBits. Replicates shard.Engine.GroupIndex so we can compute the same
+// flow key the proxy will use, without pulling in the full shard package.
+// When ShardBits is 0 or unset, every frame maps to group 0.
+func (r *Runner) groupIdx(txid [32]byte) uint32 {
+	bits := r.cfg.ShardBits
+	if bits == 0 {
+		return 0
+	}
+	prefix32 := binary.BigEndian.Uint32(txid[0:4])
+	mask := uint32(1<<bits) - 1
+	return (prefix32 >> (32 - bits)) & mask
 }
 
 // Run blocks until ctx is canceled, Count is reached, or Duration elapses.
@@ -234,20 +261,24 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			}
 		}
 
-		// Advance the gap allocator. When gap injection is enabled, pre-stamp
-		// f.SeqNum with the returned value so the proxy passes the frame through
-		// verbatim (SeqNum!=0 skips proxy stamping). The gaps in the sequence
-		// are the permanently-missing frames the listener must NACK for.
-		// When gap injection is disabled, leave f.SeqNum=0 so the proxy stamps
-		// per-flow monotonic SeqNums as normal.
-		if seqNum := r.alloc.Next(); r.alloc.GapEnabled() {
-			f.SeqNum = seqNum
-		}
-
 		// SubtreeID chosen by txid high bits so listeners filtering on a
 		// single subtree see a predictable fraction of traffic.
 		sel := binary.BigEndian.Uint64(f.TxID[:8])
 		f.SubtreeID = r.pool.Pick(sel)
+
+		// Gap injection (when enabled) pre-stamps f.SeqNum from a per-flow
+		// allocator keyed by (groupIdx, subtreeID). This matches the proxy's
+		// per-flow stamping so the listener's per-flow gap tracker can detect
+		// the injected gaps. When gap injection is disabled, leave f.SeqNum=0
+		// so the proxy stamps per-flow monotonic SeqNums as normal.
+		if r.pfa != nil {
+			groupIdx := r.groupIdx(f.TxID)
+			f.SeqNum = r.pfa.Next(seq.FlowKey{GroupIdx: groupIdx, SubtreeID: f.SubtreeID})
+		} else {
+			// Drive the global allocator's counter (used by tests / pacing
+			// observers) without pre-stamping.
+			_ = r.alloc.Next()
+		}
 
 		n, err := myframe.Encode(r.cfg.FrameVersion, f, buf)
 		if err != nil {
