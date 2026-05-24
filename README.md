@@ -132,6 +132,7 @@ subtx-gen -subtrees 8 -subtree-seed 'multicast-lab-bsv' -print-subtrees
 cmd/subtx-gen/            — CLI entry point (BRC-124/128 frame generator)
 cmd/send-block-announce/  — BRC-131 block announce sender (TCP)
 cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP)
+cmd/send-anchor-frame/    — BRC-134 anchor transaction sender (TCP)
 internal/tx/              — random BSV-shaped tx payload builder
 internal/subtree/         — deterministic subtree-ID pool
 internal/seq/             — shared seq allocator + gap injector
