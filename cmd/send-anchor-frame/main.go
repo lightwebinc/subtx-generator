@@ -1,5 +1,5 @@
 // Command send-anchor-frame sends BRC-134 chained anchor transaction frames to
-// bitcoin-shard-proxy via UDP (default) or TCP for integration testing.
+// shard-proxy via UDP (default) or TCP for integration testing.
 //
 // Anchor frames use FrameVerV6 (0x06) with a 92-byte header identical to
 // BRC-124. The proxy stamps HashKey and SeqNum in-place and forwards the
@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// BRC-134 wire constants — mirror of bitcoin-shard-common/frame.
+// BRC-134 wire constants — mirror of shard-common/frame.
 const (
 	magicBSV   = 0xE3E1F3E8
 	protoVer   = 0x02BF

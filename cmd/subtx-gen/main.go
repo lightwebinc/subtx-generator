@@ -1,5 +1,5 @@
 // Command subtx-gen generates random BSV-over-UDP frames for load/functional
-// testing of bitcoin-shard-proxy and bitcoin-shard-listener.
+// testing of shard-proxy and shard-listener.
 //
 // See README.md for the full flag set. Example:
 //
@@ -34,7 +34,7 @@ func main() {
 		frameVer              = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
 		shardBits             = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
-		subtreeSeed           = flag.String("subtree-seed", "bitcoin-subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
+		subtreeSeed           = flag.String("subtree-seed", "subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
 		pps                   = flag.Int("pps", 1000, "target packets per second (0 = unlimited)")
 		duration              = flag.Duration("duration", 10*time.Second, "runtime (0 = until count reached or SIGINT)")
 		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")

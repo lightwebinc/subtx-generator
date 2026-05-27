@@ -1,5 +1,5 @@
 // Command send-subtree-data sends BRC-132 subtree data frames to
-// bitcoin-shard-proxy via TCP for integration testing.
+// shard-proxy via TCP for integration testing.
 //
 // It sends SubtreeData frames with configurable MsgType (hashes-only or
 // full-nodes), payload size, and count. SeqNum and HashKey are left zero so
@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-// BRC-132 wire constants — mirror of bitcoin-shard-common/frame.
+// BRC-132 wire constants — mirror of shard-common/frame.
 const (
 	magicBSV   = 0xE3E1F3E8
 	protoVer   = 0x02BF

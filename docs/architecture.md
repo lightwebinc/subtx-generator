@@ -1,47 +1,47 @@
-# bitcoin-subtx-generator — Architecture
+# subtx-generator — Architecture
 
 ## Overview
 
-`bitcoin-subtx-generator` is a test traffic generator for the BSV multicast pipeline.
+`subtx-generator` is a test traffic generator for the BSV multicast pipeline.
 It generates random BRC-124/BRC-128 UDP frames at configurable rates, with controlled
 subtree ID assignment and optional sequence gap injection to exercise the NACK/retransmission
-path of `bitcoin-shard-listener` and `bitcoin-retry-endpoint`.
+path of `shard-listener` and `retry-endpoint`.
 
 It also provides three standalone tools — `send-block-announce`, `send-subtree-data`, and
 `send-anchor-frame` — for injecting BRC-131, BRC-132, and BRC-134 control-plane frames into
-`bitcoin-shard-proxy` via TCP.
+`shard-proxy` via TCP.
 
-`bitcoin-subtx-generator` is a **test tool, not a production component**. It sends frames
+`subtx-generator` is a **test tool, not a production component**. It sends frames
 only; it never joins multicast groups or receives frames.
 
 ## Pipeline Position
 
 ```text
-bitcoin-subtx-generator (subtx-gen)
+subtx-generator (subtx-gen)
       │  BRC-124/128 frames (UDP, port 9000)
       ▼
-bitcoin-shard-proxy  ──multicast──►  bitcoin-shard-listener
+shard-proxy  ──multicast──►  shard-listener
 
-bitcoin-subtx-generator (send-block-announce)
+subtx-generator (send-block-announce)
       │  BRC-131 frames (TCP, port 9002)
       ▼
-bitcoin-shard-proxy  ──CtrlGroupControl──►  bitcoin-shard-listener
+shard-proxy  ──CtrlGroupControl──►  shard-listener
 
-bitcoin-subtx-generator (send-subtree-data)
+subtx-generator (send-subtree-data)
       │  BRC-132 frames (TCP, port 9002)
       ▼
-bitcoin-shard-proxy  ──CtrlGroupSubtreeAnnounce──►  bitcoin-shard-listener
+shard-proxy  ──CtrlGroupSubtreeAnnounce──►  shard-listener
 
-bitcoin-subtx-generator (send-anchor-frame)
+subtx-generator (send-anchor-frame)
       │  BRC-134 frames (TCP, port 9002)
       ▼
-bitcoin-shard-proxy  ──CtrlGroupControl──►  bitcoin-shard-listener
+shard-proxy  ──CtrlGroupControl──►  shard-listener
 ```
 
 ## Package Structure
 
 ```
-bitcoin-subtx-generator/
+subtx-generator/
   cmd/subtx-gen/           CLI entry point for the BRC-124/128 frame generator
   cmd/send-block-announce/ Standalone BRC-131 sender (BlockAnnounce + CoinbaseTx pairs)
   cmd/send-subtree-data/   Standalone BRC-132 sender (subtree node data)
@@ -49,7 +49,7 @@ bitcoin-subtx-generator/
   internal/tx/             Random BSV-shaped transaction payload builder
   internal/subtree/        Deterministic subtree-ID pool (seed → N stable 32-byte IDs)
   internal/seq/            Shared atomic sequence allocator with gap injection
-  internal/frame/          BRC-124/128 encoder wrapper around bitcoin-shard-common
+  internal/frame/          BRC-124/128 encoder wrapper around shard-common
   internal/rate/           Token-bucket pacer (smooth at ≤1 kpps, burst mode above)
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
   internal/announce/       BRC-127 SubtreeAnnounce TCP sender
@@ -68,7 +68,7 @@ sequence numbers across workers using an atomic counter. Each frame gets a uniqu
 `pool[uint64(txID[:8]) % N]`. The same TxID always maps to the same subtree; the same seed
 produces identical IDs across runs and machines.
 
-**HashKey and SeqNum** are emitted as zero by the generator. `bitcoin-shard-proxy` stamps
+**HashKey and SeqNum** are emitted as zero by the generator. `shard-proxy` stamps
 them in-place before multicast forwarding.
 
 **Rate pacing:** the `rate.Bucket` token-bucket pacer issues one token per millisecond.
@@ -140,5 +140,5 @@ flow accounting (label `brc134`).
 
 `HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
 `processAnchorFrame` path and the retry-endpoint anchor cache + retransmit flow. Used by
-integration scenarios 36 (delivery) and 37 (retransmit) in `bitcoin-multicast-test` (`vm-lab/scenarios/`). See
-[bitcoin-multicast/docs/brc-134-anchor-transactions.md](../../../bitcoin-multicast/docs/brc-134-anchor-transactions.md).
+integration scenarios 36 (delivery) and 37 (retransmit) in `multicast-test` (`vm-lab/scenarios/`). See
+[bsv-multicast/docs/brc-134-anchor-transactions.md](../../../bsv-multicast/docs/brc-134-anchor-transactions.md).

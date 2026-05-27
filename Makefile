@@ -1,10 +1,10 @@
 BIN      := subtx-gen
-BINARY   := bitcoin-subtx-generator
+BINARY   := subtx-generator
 PKG      := ./...
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 TAG      ?= $(VERSION)
 IMAGE    ?= ghcr.io/lightwebinc/$(BINARY)
-COMMON   ?= ../bitcoin-shard-common
+COMMON   ?= ../shard-common
 LDFLAGS  := -s -w -X main.Version=$(VERSION)
 
 DAGGER_RUN := GOWORK=off go run .

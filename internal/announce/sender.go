@@ -1,5 +1,5 @@
 // Package announce implements a periodic BRC-127 SubtreeAnnounce sender for
-// bitcoin-subtx-generator. It connects to a proxy TCP ingress address and
+// subtx-generator. It connects to a proxy TCP ingress address and
 // transmits one 64-byte SubtreeAnnounce datagram per (SubtreeID, GroupID) pair
 // at the configured interval.
 //

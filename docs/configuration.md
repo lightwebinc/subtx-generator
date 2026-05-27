@@ -1,4 +1,4 @@
-# bitcoin-subtx-generator — Configuration Reference
+# subtx-generator — Configuration Reference
 
 All parameters are accepted as CLI flags only. No environment variable fallbacks are defined.
 
@@ -15,7 +15,7 @@ BRC-127 SubtreeAnnounce datagrams via TCP.
 | `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header) |
 | `-shard-bits` | `2` | Informational: shard-bits the proxy uses (for predicted-group diagnostic logging) |
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |
-| `-subtree-seed` | `bitcoin-subtx-generator-default` | Seed for subtree ID pool derivation; plain string or hex |
+| `-subtree-seed` | `subtx-generator-default` | Seed for subtree ID pool derivation; plain string or hex |
 | `-pps` | `1000` | Target packets per second (0 = unlimited) |
 | `-duration` | `10s` | Run time (0 = run until `-count` reached or SIGINT) |
 | `-count` | `0` | Stop after N frames (0 = unlimited) |

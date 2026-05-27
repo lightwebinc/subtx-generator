@@ -1,5 +1,5 @@
 // Command send-block-announce sends BRC-131 block control frames to
-// bitcoin-shard-proxy via TCP for integration testing.
+// shard-proxy via TCP for integration testing.
 //
 // It sends pairs of BlockAnnounce (MsgType 0x01) + CoinbaseTx (MsgType 0x02)
 // frames, one pair per simulated block. SeqNum is left zero so the proxy
@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// BRC-131 wire constants — mirror of bitcoin-shard-common/frame.
+// BRC-131 wire constants — mirror of shard-common/frame.
 const (
 	magicBSV       = 0xE3E1F3E8
 	protoVer       = 0x02BF
