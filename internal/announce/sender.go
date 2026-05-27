@@ -22,8 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lightwebinc/bitcoin-shard-common/frame"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/subtree"
+	"github.com/lightwebinc/shard-common/frame"
+	"github.com/lightwebinc/subtx-generator/internal/subtree"
 )
 
 // Sender periodically transmits SubtreeAnnounce datagrams for all (SubtreeID,

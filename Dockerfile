@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Canonical multi-stage Dockerfile for bitcoin-subtx-generator.
+# Canonical multi-stage Dockerfile for subtx-generator.
 # Final image: distroless/static:nonroot. Bundles four binaries:
 #
 #   - /usr/local/bin/subtx-gen           (continuous BRC-124/BRC-128 frame generator)

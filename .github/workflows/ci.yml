@@ -16,20 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          path: bitcoin-subtx-generator
+          path: subtx-generator
 
       - uses: actions/checkout@v6
         with:
-          repository: lightwebinc/bitcoin-shard-common
-          path: bitcoin-shard-common
+          repository: lightwebinc/shard-common
+          path: shard-common
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: bitcoin-subtx-generator/go.mod
+          go-version-file: subtx-generator/go.mod
           cache: false
 
       - name: Run Dagger pipeline
-        working-directory: bitcoin-subtx-generator
+        working-directory: subtx-generator
         env:
           GOWORK: "off"
         run: make ci

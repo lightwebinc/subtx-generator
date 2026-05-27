@@ -1,4 +1,4 @@
-module github.com/lightwebinc/bitcoin-subtx-generator/ci
+module github.com/lightwebinc/subtx-generator/ci
 
 go 1.25.0
 

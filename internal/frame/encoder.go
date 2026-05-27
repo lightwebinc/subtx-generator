@@ -1,4 +1,4 @@
-// Package frame wraps github.com/lightwebinc/bitcoin-shard-common/frame to
+// Package frame wraps github.com/lightwebinc/shard-common/frame to
 // provide a v1/v2-aware encoder for the subtx-gen load generator.
 //
 // v2 encoding uses the upstream frame.Encode (always writes v2 headers).
@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	common "github.com/lightwebinc/bitcoin-shard-common/frame"
+	common "github.com/lightwebinc/shard-common/frame"
 )
 
 const maxPayload = 10 * 1024 * 1024 // 10 MiB, matches protocol spec

@@ -18,11 +18,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/announce"
-	myframe "github.com/lightwebinc/bitcoin-subtx-generator/internal/frame"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/sender"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/seq"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/subtree"
+	"github.com/lightwebinc/subtx-generator/internal/announce"
+	myframe "github.com/lightwebinc/subtx-generator/internal/frame"
+	"github.com/lightwebinc/subtx-generator/internal/sender"
+	"github.com/lightwebinc/subtx-generator/internal/seq"
+	"github.com/lightwebinc/subtx-generator/internal/subtree"
 )
 
 // Version is overridden at build time via -ldflags "-X main.Version=<ver>".

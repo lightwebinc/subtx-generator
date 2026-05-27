@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	common "github.com/lightwebinc/bitcoin-shard-common/frame"
+	common "github.com/lightwebinc/shard-common/frame"
 )
 
 func TestEncodeV2Roundtrip(t *testing.T) {

@@ -23,13 +23,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	common "github.com/lightwebinc/bitcoin-shard-common/frame"
+	common "github.com/lightwebinc/shard-common/frame"
 
-	myframe "github.com/lightwebinc/bitcoin-subtx-generator/internal/frame"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/rate"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/seq"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/subtree"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/tx"
+	myframe "github.com/lightwebinc/subtx-generator/internal/frame"
+	"github.com/lightwebinc/subtx-generator/internal/rate"
+	"github.com/lightwebinc/subtx-generator/internal/seq"
+	"github.com/lightwebinc/subtx-generator/internal/subtree"
+	"github.com/lightwebinc/subtx-generator/internal/tx"
 )
 
 // PayloadFormat selects the BSV transaction encoding written into each
