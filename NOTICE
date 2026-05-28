@@ -1,0 +1,44 @@
+subtx-generator
+Copyright 2026 Lightweb Inc. (https://lightweb.net)
+
+=========================================================================
+
+This software is a traffic generator for the BSV transaction sharding
+pipeline. It emits configurable streams of BRC-124 transaction frames,
+BRC-127 subtree group announcements, BRC-131 block announcements,
+BRC-132 subtree data frames, and BRC-134 anchor transactions over UDP
+or TCP for load and functional testing.
+
+=========================================================================
+Conceptual Attribution
+
+The IPv6 multicast transaction broadcast architecture from which this
+software draws inspiration was articulated by Dr. Craig S. Wright:
+
+  Multicast within Multicast: Anycast
+  https://singulargrit.substack.com/p/multicast-within-multicast-anycast
+  https://singulargrit.substack.com/
+
+=========================================================================
+Third-Party Standards
+
+This software emits wire-frame formats conforming to BRC-12 and
+BRC-124 (and related companions BRC-127, BRC-131, BRC-132, BRC-134),
+published standards maintained by BSV Blockchain:
+
+  BRC-12: Raw Transaction Format
+  BRC-124: Multicast Frame Format
+  BSV Blockchain Standards Repository
+  https://github.com/bitcoin-sv/BRCs/
+
+=========================================================================
+Third-Party Software
+
+This product includes third-party software, distributed under the terms
+of their respective licenses. Each dependency retains its own copyright;
+this notice does not modify those licenses.
+
+  github.com/lightwebinc/shard-common         Apache License 2.0
+  github.com/cespare/xxhash/v2                MIT License (transitive)
+
+=========================================================================
