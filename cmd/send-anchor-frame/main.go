@@ -3,7 +3,7 @@
 //
 // Anchor frames use FrameVerV6 (0x06) with a 92-byte header identical to
 // BRC-124. The proxy stamps HashKey and SeqNum in-place and forwards the
-// frame to FF0E::B:FFFE (CtrlGroupControl).
+// frame to FF0E::B:FFFE (GroupBlockBroadcast).
 //
 // Usage:
 //

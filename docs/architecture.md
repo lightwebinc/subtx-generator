@@ -25,17 +25,17 @@ shard-proxy  ──multicast──►  shard-listener
 subtx-generator (send-block-announce)
       │  BRC-131 frames (TCP, port 9002)
       ▼
-shard-proxy  ──CtrlGroupControl──►  shard-listener
+shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 
 subtx-generator (send-subtree-data)
       │  BRC-132 frames (TCP, port 9002)
       ▼
-shard-proxy  ──CtrlGroupSubtreeAnnounce──►  shard-listener
+shard-proxy  ──GroupSubtreeAnnounce──►  shard-listener
 
 subtx-generator (send-anchor-frame)
       │  BRC-134 frames (TCP, port 9002)
       ▼
-shard-proxy  ──CtrlGroupControl──►  shard-listener
+shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 ```
 
 ## Package Structure
@@ -96,7 +96,7 @@ When both `-announce-addr` and `-subtree-group` are set, an `announce.Sender` go
 connects to the proxy's TCP ingress and periodically sends BRC-127 SubtreeAnnounce
 datagrams (64 bytes each) for all subtree IDs in the pool that belong to the configured
 group(s). The proxy's `handleConn` recognises the SubtreeAnnounce version byte (`0x07`) and
-forwards it via `ForwardControl` to `CtrlGroupSubtreeAnnounce` without stamping.
+forwards it via `ForwardControl` to `GroupSubtreeAnnounce` without stamping.
 
 The re-announce ticker fires at `-announce-interval` to refresh TTLs of already-active
 subtrees. This prevents eviction from the listener's dynamic filter registry.
@@ -134,7 +134,7 @@ cycled frame-by-frame. When zero, a fresh random SubtreeID is used per frame.
 ## send-anchor-frame
 
 `send-anchor-frame` connects to the proxy TCP ingress and sends BRC-134 anchor transaction
-frames (`FrameVerV6`). Anchor frames carry a chain root and are routed to `CtrlGroupControl`
+frames (`FrameVerV6`). Anchor frames carry a chain root and are routed to `GroupBlockBroadcast`
 by the proxy, with HashKey derived against the virtual `groupIdx = 0xFFF9` for independent
 flow accounting (label `brc134`).
 

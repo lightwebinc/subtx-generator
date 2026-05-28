@@ -4,7 +4,7 @@
 // at the configured interval.
 //
 // The proxy detects the MsgTypeSubtreeAnnounce byte (0x30) at offset 6 and
-// forwards the datagram to the CtrlGroupSubtreeAnnounce multicast group
+// forwards the datagram to the GroupSubtreeAnnounce multicast group
 // instead of treating it as a BRC-124 data frame.
 //
 // Phased mode: when PhaseSize > 0 and PhaseInterval > 0 the sender starts

@@ -74,7 +74,7 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 
 ```bash
 # Connect to the proxy TCP ingress and periodically announce all subtree IDs
-# in the pool to the CtrlGroupSubtreeAnnounce control-plane multicast group.
+# in the pool to the GroupSubtreeAnnounce control-plane multicast group.
 subtx-gen \
   -addr [fd20::2]:9000 \
   -subtrees 8 \
