@@ -23,7 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	common "github.com/lightwebinc/shard-common/frame"
+	"github.com/lightwebinc/shard-common/seqhash"
+	"github.com/lightwebinc/shard-common/shard"
 
 	myframe "github.com/lightwebinc/subtx-generator/internal/frame"
 	"github.com/lightwebinc/subtx-generator/internal/rate"
@@ -62,9 +66,33 @@ func (p PayloadFormat) String() string {
 	}
 }
 
+// Mode selects how frames are emitted.
+type Mode uint8
+
+const (
+	// ModeUnicast (default) opens one UDP socket per worker and
+	// unicasts every frame to Config.Addr (the shard-proxy ingress
+	// port). The proxy stamps SeqNum/HashKey before multicasting.
+	ModeUnicast Mode = iota
+
+	// ModeDirectMulticast skips the proxy. Each worker opens an IPv6
+	// multicast egress socket bound to Config.BindSource on
+	// Config.EgressIface, derives the destination group from the TxID
+	// via a shard.Engine, and writes directly to that (S=BindSource, G)
+	// group address. The generator stamps SeqNum (per-flow via the
+	// internal allocator, matching the proxy's BRC-128 stamping
+	// semantics) and HashKey (XXH64(BindSource ∥ groupIdx ∥ subtreeID))
+	// so SSM listeners see deterministic flows and gap detection works
+	// without a proxy in the loop. Operators MUST add Config.BindSource
+	// to the shard-manifest publishers list so receivers' (S,G) joins
+	// include this generator.
+	ModeDirectMulticast
+)
+
 // Config tunes the sender.
 type Config struct {
-	Addr            string // target host:port
+	Mode            Mode   // ModeUnicast (default) | ModeDirectMulticast
+	Addr            string // unicast target host:port (ModeUnicast only)
 	FrameVersion    myframe.Version
 	Workers         int
 	PPS             int
@@ -74,7 +102,14 @@ type Config struct {
 	PayloadFormat   PayloadFormat
 	LogInterval     time.Duration
 	CorruptTxIDRate uint // percentage of frames to corrupt TxID (0-100)
-	ShardBits       uint // proxy shard-bits; used to compute per-flow groupIdx for gap injection
+	ShardBits       uint // shard-bits used to compute per-flow groupIdx
+
+	// ModeDirectMulticast fields.
+	EgressIface *net.Interface // outbound NIC for multicast egress
+	BindSource  net.IP         // IPv6 source bound on every egress socket; included in HashKey
+	MCPrefix    uint16         // upper 16 bits of the IPv6 group address (e.g. 0xFF35 for SSM/site)
+	MCGroupID   uint16         // IANA group-id (bytes 12-13); default 0x000B
+	EgressPort  int            // destination UDP port written into every multicast datagram
 }
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
@@ -186,12 +221,36 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	conn, err := net.Dial("udp", r.cfg.Addr)
-	if err != nil {
-		log.Printf("worker %d: dial %s: %v", id, r.cfg.Addr, err)
+	var conn *net.UDPConn
+	var engine *shard.Engine
+	switch r.cfg.Mode {
+	case ModeUnicast:
+		c, err := net.Dial("udp", r.cfg.Addr)
+		if err != nil {
+			log.Printf("worker %d: dial %s: %v", id, r.cfg.Addr, err)
+			return
+		}
+		conn = c.(*net.UDPConn)
+	case ModeDirectMulticast:
+		c, err := openMulticastEgress(r.cfg.EgressIface, r.cfg.BindSource)
+		if err != nil {
+			log.Printf("worker %d: open mc egress: %v", id, err)
+			return
+		}
+		conn = c
+		engine = shard.New(r.cfg.MCPrefix, r.cfg.MCGroupID, r.cfg.ShardBits)
+	default:
+		log.Printf("worker %d: unknown mode %d", id, r.cfg.Mode)
 		return
 	}
 	defer func() { _ = conn.Close() }()
+
+	// Pre-compute the per-worker source-IPv6 bytes used as input to the
+	// HashKey computation in direct-multicast mode.
+	var srcIPv6 [16]byte
+	if r.cfg.Mode == ModeDirectMulticast {
+		copy(srcIPv6[:], r.cfg.BindSource.To16())
+	}
 
 	// Per-worker PRNG seed.
 	var seed [32]byte
@@ -266,18 +325,29 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		sel := binary.BigEndian.Uint64(f.TxID[:8])
 		f.SubtreeID = r.pool.Pick(sel)
 
-		// Gap injection (when enabled) pre-stamps f.SeqNum from a per-flow
-		// allocator keyed by (groupIdx, subtreeID). This matches the proxy's
-		// per-flow stamping so the listener's per-flow gap tracker can detect
-		// the injected gaps. When gap injection is disabled, leave f.SeqNum=0
-		// so the proxy stamps per-flow monotonic SeqNums as normal.
+		// Stamp SeqNum:
+		//   - Unicast mode: the proxy stamps per-flow monotonic SeqNums;
+		//     leave 0 unless gap injection is active.
+		//   - DirectMulticast mode: the proxy is bypassed, so the
+		//     generator MUST stamp per-flow SeqNums itself.
+		groupIdx := r.groupIdx(f.TxID)
 		if r.pfa != nil {
-			groupIdx := r.groupIdx(f.TxID)
+			f.SeqNum = r.pfa.Next(seq.FlowKey{GroupIdx: groupIdx, SubtreeID: f.SubtreeID})
+		} else if r.cfg.Mode == ModeDirectMulticast {
+			// Lazily build a per-flow allocator on first use when running
+			// in direct-multicast without explicit gap injection.
+			if r.pfa == nil {
+				r.pfa = seq.NewPerFlow(seq.Config{Start: 1})
+			}
 			f.SeqNum = r.pfa.Next(seq.FlowKey{GroupIdx: groupIdx, SubtreeID: f.SubtreeID})
 		} else {
-			// Drive the global allocator's counter (used by tests / pacing
-			// observers) without pre-stamping.
 			_ = r.alloc.Next()
+		}
+
+		// In direct-multicast mode stamp HashKey from BindSource so the
+		// listener-side per-flow tracker keys on a stable identity.
+		if r.cfg.Mode == ModeDirectMulticast {
+			f.HashKey = seqhash.Hash(srcIPv6, groupIdx, f.SubtreeID)
 		}
 
 		n, err := myframe.Encode(r.cfg.FrameVersion, f, buf)
@@ -285,9 +355,16 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			r.errors.Add(1)
 			continue
 		}
-		if _, err := conn.Write(buf[:n]); err != nil {
+		var werr error
+		if r.cfg.Mode == ModeDirectMulticast {
+			dst := engine.Addr(groupIdx, r.cfg.EgressPort)
+			_, werr = conn.WriteToUDP(buf[:n], dst)
+		} else {
+			_, werr = conn.Write(buf[:n])
+		}
+		if werr != nil {
 			r.errors.Add(1)
-			if errors.Is(err, net.ErrClosed) {
+			if errors.Is(werr, net.ErrClosed) {
 				return
 			}
 			continue
@@ -295,6 +372,46 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		r.sent.Add(1)
 		r.bytes.Add(uint64(n))
 	}
+}
+
+// openMulticastEgress opens an IPv6 UDP socket bound to bindSource (or
+// the wildcard when bindSource is nil) with IPV6_MULTICAST_IF set to
+// iface. Used by ModeDirectMulticast workers as their per-worker egress
+// socket.
+func openMulticastEgress(iface *net.Interface, bindSource net.IP) (*net.UDPConn, error) {
+	listenAddr := "[::]:0"
+	if bindSource != nil {
+		listenAddr = "[" + bindSource.String() + "]:0"
+	}
+	pc, err := net.ListenPacket("udp6", listenAddr)
+	if err != nil {
+		return nil, fmt.Errorf("listen on %s: %w", listenAddr, err)
+	}
+	uc, ok := pc.(*net.UDPConn)
+	if !ok {
+		_ = pc.Close()
+		return nil, fmt.Errorf("unexpected conn type %T", pc)
+	}
+	if iface == nil {
+		return uc, nil
+	}
+	raw, err := uc.SyscallConn()
+	if err != nil {
+		_ = uc.Close()
+		return nil, fmt.Errorf("SyscallConn: %w", err)
+	}
+	var setErr error
+	if cerr := raw.Control(func(fd uintptr) {
+		setErr = unix.SetsockoptInt(int(fd), unix.IPPROTO_IPV6, unix.IPV6_MULTICAST_IF, iface.Index)
+	}); cerr != nil {
+		_ = uc.Close()
+		return nil, fmt.Errorf("Control: %w", cerr)
+	}
+	if setErr != nil {
+		_ = uc.Close()
+		return nil, fmt.Errorf("IPV6_MULTICAST_IF: %w", setErr)
+	}
+	return uc, nil
 }
 
 func (r *Runner) logger(ctx context.Context, done <-chan struct{}) {

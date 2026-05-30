@@ -12,11 +12,16 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
+
+	shardpkg "github.com/lightwebinc/shard-common/shard"
 
 	"github.com/lightwebinc/subtx-generator/internal/announce"
 	myframe "github.com/lightwebinc/subtx-generator/internal/frame"
@@ -54,6 +59,13 @@ func main() {
 		announcePhaseSize     = flag.Int("announce-phase-size", 0, "subtrees to add per phase tick (0 = announce full pool immediately)")
 		announcePhaseInterval = flag.Duration("announce-phase-interval", 0, "how often to advance the phase; 0 = disabled")
 		corruptTxIDRate       = flag.Uint("corrupt-txid-rate", 0, "percentage of frames to corrupt TxID (0-100, 0=disabled)")
+		mode                  = flag.String("mode", "unicast", "send mode: unicast (default; forward to proxy via -addr) | direct-multicast (skip proxy, emit (S=bind-source, G=engine.Addr(txid)) directly)")
+		bindSource            = flag.String("bind-source", "", "direct-multicast: IPv6 source bound on every egress socket; MUST match the value operators publish in the shard-manifest publishers list")
+		egressIface           = flag.String("egress-iface", "", "direct-multicast: outbound interface for multicast egress")
+		mcGroupIDFlag         = flag.String("mc-group-id", "0x000B", "direct-multicast: IANA group-id (bytes 12-13)")
+		sourceModeFlag        = flag.String("source-mode", "asm", "direct-multicast: addressing model asm|ssm (selects FF05/FF35/FF3E prefix)")
+		mcScopeFlag           = flag.String("scope", "site", "direct-multicast: multicast scope (site|global; in SSM mode follows shard.Prefix)")
+		egressPort            = flag.Int("egress-port", 9001, "direct-multicast: destination UDP port for multicast datagrams")
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "subtx-gen %s — BSV frame load generator\n\n", Version)
@@ -127,7 +139,7 @@ func main() {
 	}
 	_ = shardBits // reserved for future predicted-group logging
 
-	r := sender.New(sender.Config{
+	cfg := sender.Config{
 		Addr:            *addr,
 		FrameVersion:    fv,
 		Workers:         w,
@@ -139,7 +151,60 @@ func main() {
 		LogInterval:     *logInterval,
 		CorruptTxIDRate: *corruptTxIDRate,
 		ShardBits:       *shardBits,
-	}, pool, alloc)
+	}
+
+	switch strings.ToLower(*mode) {
+	case "unicast":
+		cfg.Mode = sender.ModeUnicast
+	case "direct-multicast":
+		cfg.Mode = sender.ModeDirectMulticast
+		if *bindSource == "" {
+			log.Fatal("direct-multicast: -bind-source is required")
+		}
+		ip := net.ParseIP(*bindSource)
+		if ip == nil || ip.To4() != nil {
+			log.Fatalf("direct-multicast: invalid -bind-source %q: must be an IPv6 literal", *bindSource)
+		}
+		cfg.BindSource = ip
+		if *egressIface != "" {
+			iface, err := net.InterfaceByName(*egressIface)
+			if err != nil {
+				log.Fatalf("direct-multicast: -egress-iface %q: %v", *egressIface, err)
+			}
+			cfg.EgressIface = iface
+		}
+		var sm shardpkg.SourceMode
+		switch strings.ToLower(*sourceModeFlag) {
+		case "asm":
+			sm = shardpkg.SourceModeASM
+		case "ssm":
+			sm = shardpkg.SourceModeSSM
+		default:
+			log.Fatalf("direct-multicast: invalid -source-mode %q (asm|ssm)", *sourceModeFlag)
+		}
+		scope, err := shardpkg.ParseScope(*mcScopeFlag)
+		if err != nil {
+			log.Fatalf("direct-multicast: -scope: %v", err)
+		}
+		prefix, err := shardpkg.Prefix(sm, scope)
+		if err != nil {
+			log.Fatalf("direct-multicast: %v", err)
+		}
+		cfg.MCPrefix = prefix
+		gid, err := parseUint16(*mcGroupIDFlag)
+		if err != nil {
+			log.Fatalf("direct-multicast: -mc-group-id: %v", err)
+		}
+		cfg.MCGroupID = gid
+		if *egressPort < 1 || *egressPort > 65535 {
+			log.Fatalf("direct-multicast: -egress-port out of range: %d", *egressPort)
+		}
+		cfg.EgressPort = *egressPort
+	default:
+		log.Fatalf("invalid -mode %q (unicast|direct-multicast)", *mode)
+	}
+
+	r := sender.New(cfg, pool, alloc)
 
 	// Start announce goroutine if configured.
 	if *announceAddr != "" && *subtreeGroup != "" {
@@ -178,4 +243,19 @@ func main() {
 	}
 	fmt.Fprintf(os.Stderr, "done: sent=%d errors=%d elapsed=%s avg_pps=%.0f\n",
 		sent, r.Errors(), elapsed, float64(sent)/elapsed.Seconds())
+}
+
+// parseUint16 parses "0x000B" / "0B" / "11" forms into a uint16.
+func parseUint16(s string) (uint16, error) {
+	s = strings.TrimSpace(s)
+	base := 10
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		s = s[2:]
+		base = 16
+	}
+	v, err := strconv.ParseUint(s, base, 16)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(v), nil
 }
