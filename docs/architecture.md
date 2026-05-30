@@ -68,8 +68,27 @@ sequence numbers across workers using an atomic counter. Each frame gets a uniqu
 `pool[uint64(txID[:8]) % N]`. The same TxID always maps to the same subtree; the same seed
 produces identical IDs across runs and machines.
 
-**HashKey and SeqNum** are emitted as zero by the generator. `shard-proxy` stamps
-them in-place before multicast forwarding.
+**HashKey and SeqNum** are emitted as zero by the generator in the
+default `unicast` mode. `shard-proxy` stamps them in-place before
+multicast forwarding.
+
+In `-mode=direct-multicast` (see
+[SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/SourceSpecificMulticast/ssm-support-plan.md))
+the proxy is bypassed and the generator stamps both fields itself:
+
+- **SeqNum** is allocated per `(groupIdx, subtreeID)` flow from an
+  internal `seq.PerFlowAllocator` so each flow has its own monotonic
+  counter — matching what `shard-proxy` would have produced.
+- **HashKey** is `XXH64(bindSource ∥ groupIdx ∥ subtreeID)` — the
+  same identity the listener computes for any other publisher, derived
+  from the generator's `-bind-source`. Operators MUST add
+  `-bind-source` to the `shard-manifest -publishers` list so receivers'
+  `(S,G)` joins include this generator.
+
+Each worker opens its own IPv6 multicast egress socket bound to
+`-bind-source` on `-egress-iface`, derives the destination group via
+`shard.Engine.Addr(groupIdx, -egress-port)`, and writes directly to
+`(S=-bind-source, G)`.
 
 **Rate pacing:** the `rate.Bucket` token-bucket pacer issues one token per millisecond.
 Below ~1 kpps each send is followed by a sleep; above that threshold, frames are sent in

@@ -57,6 +57,28 @@ subtx-gen \
   -workers 0
 ```
 
+### direct-multicast mode (skip the proxy)
+
+```bash
+# Emit directly to FF35::B:idx (SSM site scope) — useful for the
+# 10gb-direct-testing harness, fabric load validation, and SSM
+# scenarios where the generator is the data-plane publisher.
+# Operators MUST add -bind-source to the shard-manifest -publishers
+# list so receivers' (S,G) joins include this generator.
+subtx-gen \
+  -mode direct-multicast \
+  -bind-source fd20::abc \
+  -egress-iface eth0 \
+  -source-mode ssm \
+  -scope site \
+  -shard-bits 2 \
+  -egress-port 9001 \
+  -pps 1000 -duration 30s
+```
+
+See [bsv-multicast SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/SourceSpecificMulticast/ssm-support-plan.md)
+for the full design.
+
 ### Gap injection (NACK / retransmit tests)
 
 ```bash
