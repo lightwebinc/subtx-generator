@@ -405,7 +405,7 @@ func openMulticastEgress(iface *net.Interface, bindSource net.IP) (*net.UDPConn,
 		setErr = unix.SetsockoptInt(int(fd), unix.IPPROTO_IPV6, unix.IPV6_MULTICAST_IF, iface.Index)
 	}); cerr != nil {
 		_ = uc.Close()
-		return nil, fmt.Errorf("Control: %w", cerr)
+		return nil, fmt.Errorf("control: %w", cerr)
 	}
 	if setErr != nil {
 		_ = uc.Close()
