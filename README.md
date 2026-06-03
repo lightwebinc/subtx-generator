@@ -28,6 +28,9 @@ as zero; the proxy stamps them in-place before multicast forwarding.
 - **Deterministic Subtree pick** — `SubtreeID = pool[uint64(TxID[:8]) % N]`
   so listeners filtering on a single subtree see a predictable traffic
   fraction (≈ `1/N`).
+- **Unified structured logging** — uses `shard-common/logging` (no more plain
+  `log`); set `LOG_FORMAT=json` for JSON-on-stdout matching the rest of the
+  fleet. See the [Unified Logging Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/UnifiedLogging/unified-logging-plan.md).
 
 ## Install
 
