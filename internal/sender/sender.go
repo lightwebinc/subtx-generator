@@ -16,7 +16,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"sync"
@@ -227,20 +227,20 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	case ModeUnicast:
 		c, err := net.Dial("udp", r.cfg.Addr)
 		if err != nil {
-			log.Printf("worker %d: dial %s: %v", id, r.cfg.Addr, err)
+			infof("worker %d: dial %s: %v", id, r.cfg.Addr, err)
 			return
 		}
 		conn = c.(*net.UDPConn)
 	case ModeDirectMulticast:
 		c, err := openMulticastEgress(r.cfg.EgressIface, r.cfg.BindSource)
 		if err != nil {
-			log.Printf("worker %d: open mc egress: %v", id, err)
+			infof("worker %d: open mc egress: %v", id, err)
 			return
 		}
 		conn = c
 		engine = shard.New(r.cfg.MCPrefix, r.cfg.MCGroupID, r.cfg.ShardBits)
 	default:
-		log.Printf("worker %d: unknown mode %d", id, r.cfg.Mode)
+		infof("worker %d: unknown mode %d", id, r.cfg.Mode)
 		return
 	}
 	defer func() { _ = conn.Close() }()
@@ -255,7 +255,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	// Per-worker PRNG seed.
 	var seed [32]byte
 	if _, err := cryptorand.Read(seed[:]); err != nil {
-		log.Printf("worker %d: seed: %v", id, err)
+		infof("worker %d: seed: %v", id, err)
 		return
 	}
 	seed[0] ^= byte(id)
@@ -448,3 +448,5 @@ func (r *Runner) Sent() uint64 { return r.sent.Load() }
 
 // Errors returns the total send errors observed.
 func (r *Runner) Errors() uint64 { return r.errors.Load() }
+
+func infof(format string, args ...any) { slog.Info(fmt.Sprintf(format, args...)) }

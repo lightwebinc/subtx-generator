@@ -11,7 +11,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lightwebinc/shard-common/logging"
 	shardpkg "github.com/lightwebinc/shard-common/shard"
 
 	"github.com/lightwebinc/subtx-generator/internal/announce"
@@ -74,6 +75,13 @@ func main() {
 	}
 	flag.Parse()
 
+	logging.Init(logging.Options{
+		Service: "subtx-generator",
+		Version: Version,
+		Level:   slog.LevelInfo,
+		Format:  logging.ParseFormat(os.Getenv("LOG_FORMAT")),
+	})
+
 	// Resolve subtree seed: allow raw hex or plain string.
 	var seedBytes []byte
 	if b, err := hex.DecodeString(*subtreeSeed); err == nil && len(b) > 0 {
@@ -98,7 +106,7 @@ func main() {
 	case 2:
 		fv = myframe.V2
 	default:
-		log.Fatalf("frame-version must be 1 or 2, got %d", *frameVer)
+		fatalf("frame-version must be 1 or 2, got %d", *frameVer)
 	}
 
 	// Payload format (BRC-12 raw vs BRC-30 EF).
@@ -111,7 +119,7 @@ func main() {
 	case "mixed":
 		pf = sender.PayloadMixed
 	default:
-		log.Fatalf("payload-format must be brc124, brc128, or mixed; got %q", *payloadFormat)
+		fatalf("payload-format must be brc124, brc128, or mixed; got %q", *payloadFormat)
 	}
 
 	w := *workers
@@ -159,17 +167,17 @@ func main() {
 	case "direct-multicast":
 		cfg.Mode = sender.ModeDirectMulticast
 		if *bindSource == "" {
-			log.Fatal("direct-multicast: -bind-source is required")
+			fatal("direct-multicast: -bind-source is required")
 		}
 		ip := net.ParseIP(*bindSource)
 		if ip == nil || ip.To4() != nil {
-			log.Fatalf("direct-multicast: invalid -bind-source %q: must be an IPv6 literal", *bindSource)
+			fatalf("direct-multicast: invalid -bind-source %q: must be an IPv6 literal", *bindSource)
 		}
 		cfg.BindSource = ip
 		if *egressIface != "" {
 			iface, err := net.InterfaceByName(*egressIface)
 			if err != nil {
-				log.Fatalf("direct-multicast: -egress-iface %q: %v", *egressIface, err)
+				fatalf("direct-multicast: -egress-iface %q: %v", *egressIface, err)
 			}
 			cfg.EgressIface = iface
 		}
@@ -180,28 +188,28 @@ func main() {
 		case "ssm":
 			sm = shardpkg.SourceModeSSM
 		default:
-			log.Fatalf("direct-multicast: invalid -source-mode %q (asm|ssm)", *sourceModeFlag)
+			fatalf("direct-multicast: invalid -source-mode %q (asm|ssm)", *sourceModeFlag)
 		}
 		scope, err := shardpkg.ParseScope(*mcScopeFlag)
 		if err != nil {
-			log.Fatalf("direct-multicast: -scope: %v", err)
+			fatalf("direct-multicast: -scope: %v", err)
 		}
 		prefix, err := shardpkg.Prefix(sm, scope)
 		if err != nil {
-			log.Fatalf("direct-multicast: %v", err)
+			fatalf("direct-multicast: %v", err)
 		}
 		cfg.MCPrefix = prefix
 		gid, err := parseUint16(*mcGroupIDFlag)
 		if err != nil {
-			log.Fatalf("direct-multicast: -mc-group-id: %v", err)
+			fatalf("direct-multicast: -mc-group-id: %v", err)
 		}
 		cfg.MCGroupID = gid
 		if *egressPort < 1 || *egressPort > 65535 {
-			log.Fatalf("direct-multicast: -egress-port out of range: %d", *egressPort)
+			fatalf("direct-multicast: -egress-port out of range: %d", *egressPort)
 		}
 		cfg.EgressPort = *egressPort
 	default:
-		log.Fatalf("invalid -mode %q (unicast|direct-multicast)", *mode)
+		fatalf("invalid -mode %q (unicast|direct-multicast)", *mode)
 	}
 
 	r := sender.New(cfg, pool, alloc)
@@ -210,7 +218,7 @@ func main() {
 	if *announceAddr != "" && *subtreeGroup != "" {
 		groupIDs, err := announce.ParseGroupIDs(*subtreeGroup)
 		if err != nil {
-			log.Fatalf("subtree-group: %v", err)
+			fatalf("subtree-group: %v", err)
 		}
 		sal := &announce.Sender{
 			ProxyAddr:     *announceAddr,
@@ -223,7 +231,7 @@ func main() {
 		}
 		go func() {
 			if err := sal.Run(ctx); err != nil && ctx.Err() == nil {
-				log.Printf("announce: %v", err)
+				infof("announce: %v", err)
 			}
 		}()
 		if *announcePhaseSize > 0 && *announcePhaseInterval > 0 {
@@ -239,7 +247,7 @@ func main() {
 	sent, err := r.Run(ctx)
 	elapsed := time.Since(start)
 	if err != nil {
-		log.Fatalf("run: %v", err)
+		fatalf("run: %v", err)
 	}
 	fmt.Fprintf(os.Stderr, "done: sent=%d errors=%d elapsed=%s avg_pps=%.0f\n",
 		sent, r.Errors(), elapsed, float64(sent)/elapsed.Seconds())
@@ -258,4 +266,21 @@ func parseUint16(s string) (uint16, error) {
 		return 0, err
 	}
 	return uint16(v), nil
+}
+
+// fatalf logs a formatted error through the unified logger and exits non-zero.
+func fatalf(format string, args ...any) {
+	slog.Error(fmt.Sprintf(format, args...))
+	os.Exit(1)
+}
+
+// fatal logs an error message through the unified logger and exits non-zero.
+func fatal(msg string) {
+	slog.Error(msg)
+	os.Exit(1)
+}
+
+// infof logs a formatted info line through the unified logger.
+func infof(format string, args ...any) {
+	slog.Info(fmt.Sprintf(format, args...))
 }

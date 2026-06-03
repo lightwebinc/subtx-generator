@@ -15,8 +15,11 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+
+	"github.com/lightwebinc/shard-common/logging"
 	"net"
+	"os"
 	"time"
 )
 
@@ -48,6 +51,7 @@ func main() {
 		"number of unique subtree IDs to cycle through (0 = one fresh random ID per frame)")
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")
 	flag.Parse()
+	logging.Init(logging.Options{Service: "subtx-generator", Level: slog.LevelInfo, Format: logging.ParseFormat(os.Getenv("LOG_FORMAT"))})
 
 	var msgType byte
 	var nodeSize int
@@ -59,7 +63,7 @@ func main() {
 		msgType = subtreeMsgFullNodes
 		nodeSize = subtreeNodeFullSize
 	default:
-		log.Fatalf("unknown msg-type %q: want hashes or full", *msgTypeStr)
+		fatalf("unknown msg-type %q: want hashes or full", *msgTypeStr)
 	}
 
 	payLen := *payloadSize
@@ -81,10 +85,10 @@ func main() {
 
 	conn, err := net.DialTimeout("tcp", *addr, 5*time.Second)
 	if err != nil {
-		log.Fatalf("dial %s: %v", *addr, err)
+		fatalf("dial %s: %v", *addr, err)
 	}
 	defer func() { _ = conn.Close() }()
-	log.Printf("connected to %s; sending %d BRC-132 frames (msg=%s payload=%dB)",
+	infof("connected to %s; sending %d BRC-132 frames (msg=%s payload=%dB)",
 		*addr, *frameCount, *msgTypeStr, payLen)
 
 	sent := 0
@@ -104,7 +108,7 @@ func main() {
 
 		frame := encodeSubtreeDataFrame(msgType, subtreeID, payload)
 		if err := writeFrame(conn, frame); err != nil {
-			log.Fatalf("frame %d write: %v", i, err)
+			fatalf("frame %d write: %v", i, err)
 		}
 		sent++
 
@@ -116,7 +120,7 @@ func main() {
 		}
 	}
 
-	log.Printf("done: sent=%d frames", sent)
+	infof("done: sent=%d frames", sent)
 }
 
 // encodeSubtreeDataFrame builds a BRC-132 wire frame.
@@ -148,6 +152,9 @@ func writeFrame(conn net.Conn, frame []byte) error {
 
 func mustRand(b []byte) {
 	if _, err := rand.Read(b); err != nil {
-		log.Fatalf("rand.Read: %v", err)
+		fatalf("rand.Read: %v", err)
 	}
 }
+
+func fatalf(format string, args ...any) { slog.Error(fmt.Sprintf(format, args...)); os.Exit(1) }
+func infof(format string, args ...any)  { slog.Info(fmt.Sprintf(format, args...)) }

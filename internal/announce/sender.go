@@ -16,7 +16,8 @@ package announce
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -99,10 +100,10 @@ func (s *Sender) Run(ctx context.Context) error {
 						next = int32(s.Pool.Len())
 					}
 					s.phase.Store(next)
-					log.Printf("announce: phase advanced to %d/%d subtrees", next, s.Pool.Len())
+					infof("announce: phase advanced to %d/%d subtrees", next, s.Pool.Len())
 					// Immediately announce the newly-added subtrees.
 					if err2 := s.sendUpTo(conn, int(next)); err2 != nil {
-						log.Printf("announce: phase send error: %v", err2)
+						infof("announce: phase send error: %v", err2)
 					}
 				}
 			}
@@ -163,7 +164,7 @@ func (s *Sender) sendUpTo(conn net.Conn, limit int) error {
 			}
 		}
 	}
-	log.Printf("announce: sent %d datagrams (%d subtrees × %d groups)",
+	infof("announce: sent %d datagrams (%d subtrees × %d groups)",
 		limit*len(s.GroupIDs), limit, len(s.GroupIDs))
 	return nil
 }
@@ -236,3 +237,5 @@ func splitComma(s string) []string {
 	out = append(out, s[start:])
 	return out
 }
+
+func infof(format string, args ...any) { slog.Info(fmt.Sprintf(format, args...)) }

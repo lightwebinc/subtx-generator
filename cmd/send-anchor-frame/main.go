@@ -16,8 +16,11 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+
+	"github.com/lightwebinc/shard-common/logging"
 	"net"
+	"os"
 	"time"
 )
 
@@ -36,15 +39,16 @@ func main() {
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")
 	useTCP := flag.Bool("tcp", false, "send over TCP instead of UDP")
 	flag.Parse()
+	logging.Init(logging.Options{Service: "subtx-generator", Level: slog.LevelInfo, Format: logging.ParseFormat(os.Getenv("LOG_FORMAT"))})
 
 	var send func([]byte) error
 	if *useTCP {
 		conn, err := net.DialTimeout("tcp", *addr, 5*time.Second)
 		if err != nil {
-			log.Fatalf("tcp dial %s: %v", *addr, err)
+			fatalf("tcp dial %s: %v", *addr, err)
 		}
 		defer func() { _ = conn.Close() }()
-		log.Printf("connected TCP → %s", *addr)
+		infof("connected TCP → %s", *addr)
 		send = func(b []byte) error {
 			_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			_, err := conn.Write(b)
@@ -53,10 +57,10 @@ func main() {
 	} else {
 		conn, err := net.Dial("udp", *addr)
 		if err != nil {
-			log.Fatalf("udp dial %s: %v", *addr, err)
+			fatalf("udp dial %s: %v", *addr, err)
 		}
 		defer func() { _ = conn.Close() }()
-		log.Printf("sending UDP → %s", *addr)
+		infof("sending UDP → %s", *addr)
 		send = func(b []byte) error {
 			_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			_, err := conn.Write(b)
@@ -73,7 +77,7 @@ func main() {
 
 		frame := encodeAnchorFrame(txid, payload)
 		if err := send(frame); err != nil {
-			log.Fatalf("frame %d send: %v", i, err)
+			fatalf("frame %d send: %v", i, err)
 		}
 
 		fmt.Printf("anchor %d: txid=%x payload_bytes=%d\n", i, txid[:8], len(payload))
@@ -83,7 +87,7 @@ func main() {
 		}
 	}
 
-	log.Printf("done: sent=%d anchor frames", *count)
+	infof("done: sent=%d anchor frames", *count)
 }
 
 // encodeAnchorFrame builds a BRC-134 wire frame (HashKey/SeqNum=0; proxy stamps).
@@ -104,6 +108,9 @@ func encodeAnchorFrame(txid [32]byte, payload []byte) []byte {
 
 func mustRand(b []byte) {
 	if _, err := rand.Read(b); err != nil {
-		log.Fatalf("rand.Read: %v", err)
+		fatalf("rand.Read: %v", err)
 	}
 }
+
+func fatalf(format string, args ...any) { slog.Error(fmt.Sprintf(format, args...)); os.Exit(1) }
+func infof(format string, args ...any)  { slog.Info(fmt.Sprintf(format, args...)) }

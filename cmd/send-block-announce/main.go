@@ -16,8 +16,11 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+
+	"github.com/lightwebinc/shard-common/logging"
 	"net"
+	"os"
 	"time"
 )
 
@@ -39,13 +42,14 @@ func main() {
 	interval := flag.Duration("interval", 100*time.Millisecond, "delay between block pairs")
 	coinbase := flag.Bool("coinbase", true, "also send a CoinbaseTx frame for each block")
 	flag.Parse()
+	logging.Init(logging.Options{Service: "subtx-generator", Level: slog.LevelInfo, Format: logging.ParseFormat(os.Getenv("LOG_FORMAT"))})
 
 	conn, err := net.DialTimeout("tcp", *addr, 5*time.Second)
 	if err != nil {
-		log.Fatalf("dial %s: %v", *addr, err)
+		fatalf("dial %s: %v", *addr, err)
 	}
 	defer func() { _ = conn.Close() }()
-	log.Printf("connected to %s", *addr)
+	infof("connected to %s", *addr)
 
 	sent := 0
 	for i := 0; i < *blocks; i++ {
@@ -74,7 +78,7 @@ func main() {
 		announcePay := encodeBlockAnnounce(blockHdr, coinbaseTxID, subtreeHashes)
 		announceFrame := encodeBlockFrame(msgAnnounce, blockHash, announcePay)
 		if err := writeFrame(conn, announceFrame); err != nil {
-			log.Fatalf("block %d announce write: %v", i, err)
+			fatalf("block %d announce write: %v", i, err)
 		}
 		sent++
 
@@ -82,7 +86,7 @@ func main() {
 		if *coinbase {
 			coinbaseFrame := encodeBlockFrame(msgCoinbase, coinbaseTxID, coinbaseTx)
 			if err := writeFrame(conn, coinbaseFrame); err != nil {
-				log.Fatalf("block %d coinbase write: %v", i, err)
+				fatalf("block %d coinbase write: %v", i, err)
 			}
 			sent++
 		}
@@ -95,7 +99,7 @@ func main() {
 		}
 	}
 
-	log.Printf("done: sent=%d frames (%d blocks)", sent, *blocks)
+	infof("done: sent=%d frames (%d blocks)", sent, *blocks)
 }
 
 // encodeBlockFrame builds a BRC-131 wire frame (SeqNum=0; proxy stamps it).
@@ -137,6 +141,9 @@ func writeFrame(conn net.Conn, frame []byte) error {
 
 func mustRand(b []byte) {
 	if _, err := rand.Read(b); err != nil {
-		log.Fatalf("rand.Read: %v", err)
+		fatalf("rand.Read: %v", err)
 	}
 }
+
+func fatalf(format string, args ...any) { slog.Error(fmt.Sprintf(format, args...)); os.Exit(1) }
+func infof(format string, args ...any)  { slog.Info(fmt.Sprintf(format, args...)) }
