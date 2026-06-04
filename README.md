@@ -95,11 +95,11 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 ```
 
-### BRC-127 SubtreeAnnounce sender
+### BRC-127 SubtreeGroupAnnounce sender
 
 ```bash
 # Connect to the proxy TCP ingress and periodically announce all subtree IDs
-# in the pool to the GroupSubtreeAnnounce control-plane multicast group.
+# in the pool to the GroupSubtreeDataAnnounce control-plane multicast group.
 subtx-gen \
   -addr [fd20::2]:9000 \
   -subtrees 8 \
@@ -139,7 +139,7 @@ subtx-gen \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-subtree-group` | | Comma-separated 32-char hex GroupIDs to announce |
-| `-announce-addr` | | Proxy TCP address for SubtreeAnnounce (empty = disabled) |
+| `-announce-addr` | | Proxy TCP address for SubtreeGroupAnnounce (empty = disabled) |
 | `-announce-interval` | `10s` | Re-announce period (TTL refresh for active subtrees) |
 | `-announce-ttl` | `0` | TTL field in datagram; 0 = use listener default |
 | `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
@@ -164,7 +164,7 @@ internal/seq/             — shared seq allocator + gap injector
 internal/frame/           — v1/v2 encoder wrapper around shard-common
 internal/rate/            — token-bucket pacer (smooth / burst)
 internal/sender/          — worker pool driving net.UDPConn per worker
-internal/announce/        — BRC-127 SubtreeAnnounce TCP sender
+internal/announce/        — BRC-127 SubtreeGroupAnnounce TCP sender
 ```
 
 See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.

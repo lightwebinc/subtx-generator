@@ -3,7 +3,7 @@ module github.com/lightwebinc/subtx-generator
 go 1.25.11
 
 require (
-	github.com/lightwebinc/shard-common v0.13.4
+	github.com/lightwebinc/shard-common v0.13.5
 	golang.org/x/sys v0.42.0
 )
 

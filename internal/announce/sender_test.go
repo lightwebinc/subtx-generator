@@ -78,7 +78,7 @@ func TestSendUpTo_EmitsAllPairs(t *testing.T) {
 		TTL:      60,
 	}
 	const limit = 3
-	want := limit * len(s.GroupIDs) * frame.SubtreeAnnounceSize
+	want := limit * len(s.GroupIDs) * frame.SubtreeGroupAnnounceSize
 
 	client, server := net.Pipe()
 	defer func() { _ = client.Close() }()
@@ -93,7 +93,7 @@ func TestSendUpTo_EmitsAllPairs(t *testing.T) {
 		errc <- err
 		// Decode the first datagram to confirm wire validity.
 		if err == nil {
-			if _, derr := frame.DecodeSubtreeAnnounce(buf[:frame.SubtreeAnnounceSize]); derr != nil {
+			if _, derr := frame.DecodeSubtreeGroupAnnounce(buf[:frame.SubtreeGroupAnnounceSize]); derr != nil {
 				errc <- derr
 			}
 		}

@@ -30,7 +30,7 @@ shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 subtx-generator (send-subtree-data)
       │  BRC-132 frames (TCP, port 9002)
       ▼
-shard-proxy  ──GroupSubtreeAnnounce──►  shard-listener
+shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
 
 subtx-generator (send-anchor-frame)
       │  BRC-134 frames (TCP, port 9002)
@@ -52,7 +52,7 @@ subtx-generator/
   internal/frame/          BRC-124/128 encoder wrapper around shard-common
   internal/rate/           Token-bucket pacer (smooth at ≤1 kpps, burst mode above)
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
-  internal/announce/       BRC-127 SubtreeAnnounce TCP sender
+  internal/announce/       BRC-127 SubtreeGroupAnnounce TCP sender
 ```
 
 ## Frame Generation (subtx-gen)
@@ -109,13 +109,13 @@ endpoint has served it, the generator's delayed retransmit may arrive as a dupli
 `bsl_gaps_suppressed_total` should rise. If D is zero (the default), the gap is permanent
 and ultimately increments `bsl_gaps_unrecovered_total` on the listener.
 
-## BRC-127 SubtreeAnnounce (announce mode)
+## BRC-127 SubtreeGroupAnnounce (announce mode)
 
 When both `-announce-addr` and `-subtree-group` are set, an `announce.Sender` goroutine
-connects to the proxy's TCP ingress and periodically sends BRC-127 SubtreeAnnounce
+connects to the proxy's TCP ingress and periodically sends BRC-127 SubtreeGroupAnnounce
 datagrams (64 bytes each) for all subtree IDs in the pool that belong to the configured
-group(s). The proxy's `handleConn` recognises the SubtreeAnnounce version byte (`0x07`) and
-forwards it via `ForwardControl` to `GroupSubtreeAnnounce` without stamping.
+group(s). The proxy's `handleConn` recognises the SubtreeGroupAnnounce MsgType byte (`0x30`) and
+forwards it via `ForwardControl` to `GroupSubtreeGroupAnnounce` (0xFFFC) without stamping.
 
 The re-announce ticker fires at `-announce-interval` to refresh TTLs of already-active
 subtrees. This prevents eviction from the listener's dynamic filter registry.

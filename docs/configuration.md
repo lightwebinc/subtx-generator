@@ -7,7 +7,7 @@ All parameters are accepted as CLI flags only. No environment variable fallbacks
 ## subtx-gen
 
 Generates random BRC-124/BRC-128 UDP frames at configurable rates and optionally sends
-BRC-127 SubtreeAnnounce datagrams via TCP.
+BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -29,9 +29,9 @@ BRC-127 SubtreeAnnounce datagrams via TCP.
 | `-log-interval` | `1s` | Periodic statistics log interval |
 | `-print-subtrees` | `false` | Print all subtree IDs in the pool and exit |
 | `-subtree-group` | `""` | Comma-separated 32-char hex GroupIDs for BRC-127 announce (empty = disabled) |
-| `-announce-addr` | `""` | Proxy TCP address for BRC-127 SubtreeAnnounce (empty = disabled) |
-| `-announce-interval` | `10s` | SubtreeAnnounce re-announce period (TTL refresh cadence for active subtrees) |
-| `-announce-ttl` | `0` | TTL field in SubtreeAnnounce datagrams; 0 = use listener default |
+| `-announce-addr` | `""` | Proxy TCP address for BRC-127 SubtreeGroupAnnounce (empty = disabled) |
+| `-announce-interval` | `10s` | SubtreeGroupAnnounce re-announce period (TTL refresh cadence for active subtrees) |
+| `-announce-ttl` | `0` | TTL field in SubtreeGroupAnnounce datagrams; 0 = use listener default |
 | `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
 | `-announce-phase-interval` | `0` | Phase tick interval; 0 = phased mode disabled |
 | `-corrupt-txid-rate` | `0` | Percentage of frames with a corrupted TxID field (0–100); for listener payload-hash verification tests |

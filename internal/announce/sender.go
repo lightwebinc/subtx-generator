@@ -1,10 +1,10 @@
-// Package announce implements a periodic BRC-127 SubtreeAnnounce sender for
+// Package announce implements a periodic BRC-127 SubtreeGroupAnnounce sender for
 // subtx-generator. It connects to a proxy TCP ingress address and
-// transmits one 64-byte SubtreeAnnounce datagram per (SubtreeID, GroupID) pair
+// transmits one 64-byte SubtreeGroupAnnounce datagram per (SubtreeID, GroupID) pair
 // at the configured interval.
 //
-// The proxy detects the MsgTypeSubtreeAnnounce byte (0x30) at offset 6 and
-// forwards the datagram to the GroupSubtreeAnnounce multicast group
+// The proxy detects the MsgTypeSubtreeGroupAnnounce byte (0x30) at offset 6 and
+// forwards the datagram to the GroupSubtreeGroupAnnounce multicast group (0xFFFC)
 // instead of treating it as a BRC-124 data frame.
 //
 // Phased mode: when PhaseSize > 0 and PhaseInterval > 0 the sender starts
@@ -27,7 +27,7 @@ import (
 	"github.com/lightwebinc/subtx-generator/internal/subtree"
 )
 
-// Sender periodically transmits SubtreeAnnounce datagrams for all (SubtreeID,
+// Sender periodically transmits SubtreeGroupAnnounce datagrams for all (SubtreeID,
 // GroupID) pairs over a TCP connection to the proxy.
 type Sender struct {
 	// ProxyAddr is the TCP address of the proxy's TCP ingress port.
@@ -63,7 +63,7 @@ type Sender struct {
 	writeMu sync.Mutex
 }
 
-// Run connects to ProxyAddr and periodically sends SubtreeAnnounce datagrams
+// Run connects to ProxyAddr and periodically sends SubtreeGroupAnnounce datagrams
 // for all active (SubtreeID, GroupID) pairs. Blocks until ctx is cancelled.
 func (s *Sender) Run(ctx context.Context) error {
 	if s.Interval <= 0 {
@@ -135,14 +135,14 @@ func (s *Sender) Run(ctx context.Context) error {
 	}
 }
 
-// sendUpTo sends SubtreeAnnounce datagrams for pool[0..limit) × all GroupIDs.
+// sendUpTo sends SubtreeGroupAnnounce datagrams for pool[0..limit) × all GroupIDs.
 // It holds writeMu for the duration so concurrent callers don't interleave.
 func (s *Sender) sendUpTo(conn net.Conn, limit int) error {
 	if limit <= 0 {
 		return nil
 	}
 	epoch := uint32(time.Now().Unix())
-	buf := make([]byte, frame.SubtreeAnnounceSize)
+	buf := make([]byte, frame.SubtreeGroupAnnounceSize)
 
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
@@ -150,13 +150,13 @@ func (s *Sender) sendUpTo(conn net.Conn, limit int) error {
 	for i := 0; i < limit; i++ {
 		sid := s.Pool.At(i)
 		for _, gid := range s.GroupIDs {
-			ann := &frame.SubtreeAnnounce{
+			ann := &frame.SubtreeGroupAnnounce{
 				SubtreeID: sid,
 				GroupID:   gid,
 				Epoch:     epoch,
 				TTL:       s.TTL,
 			}
-			if _, err := frame.EncodeSubtreeAnnounce(ann, buf); err != nil {
+			if _, err := frame.EncodeSubtreeGroupAnnounce(ann, buf); err != nil {
 				return err
 			}
 			if _, err := conn.Write(buf); err != nil {
