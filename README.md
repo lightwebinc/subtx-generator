@@ -5,6 +5,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/lightwebinc/subtx-generator)](https://goreportcard.com/report/github.com/lightwebinc/subtx-generator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
+> Part of the [**BSV Layered Multicast**](https://github.com/lightwebinc/bsv-multicast) open-source project — see the main repository for the full architecture, design docs, and BRC specifications.
+
 Random BSV-over-UDP frame generator for load and functional testing of
 [`shard-proxy`](https://github.com/lightwebinc/shard-proxy)
 and [`shard-listener`](https://github.com/lightwebinc/shard-listener).
