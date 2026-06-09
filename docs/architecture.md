@@ -73,7 +73,7 @@ default `unicast` mode. `shard-proxy` stamps them in-place before
 multicast forwarding.
 
 In `-mode=direct-multicast` (see
-[SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/SourceSpecificMulticast/ssm-support-plan.md))
+[SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm))
 the proxy is bypassed and the generator stamps both fields itself:
 
 - **SeqNum** is allocated per `(groupIdx, subtreeID)` flow from an

@@ -35,7 +35,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
 | `-announce-phase-interval` | `0` | Phase tick interval; 0 = phased mode disabled |
 | `-corrupt-txid-rate` | `0` | Percentage of frames with a corrupted TxID field (0–100); for listener payload-hash verification tests |
-| `-mode` | `unicast` | Send mode: `unicast` (default — forward to proxy via `-addr`) or `direct-multicast` (skip the proxy and emit directly to the SSM data plane; see [SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/SourceSpecificMulticast/ssm-support-plan.md)). |
+| `-mode` | `unicast` | Send mode: `unicast` (default — forward to proxy via `-addr`) or `direct-multicast` (skip the proxy and emit directly to the SSM data plane; see [SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)). |
 | `-bind-source` | `""` | direct-multicast: IPv6 literal bound on every egress socket. Required when `-mode=direct-multicast`. MUST be added to the shard-manifest publishers list so receivers' `(S,G)` joins include this generator. |
 | `-egress-iface` | `""` | direct-multicast: outbound interface for multicast egress (used for `IPV6_MULTICAST_IF`). |
 | `-source-mode` | `asm` | direct-multicast: addressing model `asm` or `ssm` (selects FF05/FF35/FF3E prefix via `shard.Prefix`). |

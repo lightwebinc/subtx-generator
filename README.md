@@ -81,7 +81,7 @@ subtx-gen \
   -pps 1000 -duration 30s
 ```
 
-See [bsv-multicast SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/SourceSpecificMulticast/ssm-support-plan.md)
+See [bsv-multicast SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)
 for the full design.
 
 ### Gap injection (NACK / retransmit tests)
