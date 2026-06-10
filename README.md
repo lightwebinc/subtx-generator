@@ -65,9 +65,9 @@ subtx-gen \
 ### direct-multicast mode (skip the proxy)
 
 ```bash
-# Emit directly to FF35::B:idx (SSM site scope) — useful for the
-# 10gb-direct-testing harness, fabric load validation, and SSM
-# scenarios where the generator is the data-plane publisher.
+# Emit directly to FF35::B:idx (SSM site scope) — useful for fabric
+# load validation and SSM scenarios where the generator is the
+# data-plane publisher.
 # Operators MUST add -bind-source to the shard-manifest -publishers
 # list so receivers' (S,G) joins include this generator.
 subtx-gen \

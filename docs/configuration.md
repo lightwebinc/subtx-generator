@@ -1,6 +1,10 @@
 # subtx-generator — Configuration Reference
 
-All parameters are accepted as CLI flags only. No environment variable fallbacks are defined.
+All parameters are accepted as CLI flags only, with one exception: every binary
+(`subtx-gen`, `send-block-announce`, `send-subtree-data`, `send-anchor-frame`)
+reads the `LOG_FORMAT` environment variable (`text` default | `json`) for
+unified structured logging via `shard-common/logging` — see the
+[canonical logging doc](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
 
 ---
 
@@ -55,9 +59,9 @@ SeqNum (per-flow, matching the proxy's BRC-128 semantics) and HashKey
 deterministic flows and gap detection works without a proxy in the
 loop.
 
-Use this mode for the `10gb-direct-testing` harness, fabric
-load-validation without the proxy in the path, or any SSM scenario
-where the generator should be a first-class data-plane publisher.
+Use this mode for fabric load-validation without the proxy in the
+path, or any SSM scenario where the generator should be a first-class
+data-plane publisher.
 
 ### Gap Injection
 
