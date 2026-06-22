@@ -7,7 +7,7 @@
 //
 // Usage:
 //
-//	send-anchor-frame -addr [fd20::2]:9000 -count 20
+//	send-anchor-frame -addr [fd20::2]:8725 -count 20
 //	send-anchor-frame -addr [fd20::2]:9002 -tcp -count 20
 package main
 
@@ -33,7 +33,7 @@ const (
 )
 
 func main() {
-	addr := flag.String("addr", "[::1]:9000", "proxy address (host:port); UDP by default")
+	addr := flag.String("addr", "[::1]:8725", "proxy address (host:port); UDP by default")
 	count := flag.Int("count", 10, "number of anchor frames to send")
 	payloadSize := flag.Int("payload-size", 256, "raw anchor tx payload size in bytes")
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")

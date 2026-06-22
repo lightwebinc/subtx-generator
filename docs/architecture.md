@@ -18,7 +18,7 @@ only; it never joins multicast groups or receives frames.
 
 ```text
 subtx-generator (subtx-gen)
-      │  BRC-124/128 frames (UDP, port 9000)
+      │  BRC-124/128 frames (UDP, port 8725)
       ▼
 shard-proxy  ──multicast──►  shard-listener
 

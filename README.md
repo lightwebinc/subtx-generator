@@ -51,7 +51,7 @@ make install-source  # lxc file push to the `source` LXD VM
 
 ```bash
 subtx-gen \
-  -addr [fd20::2]:9000 \
+  -addr [fd20::2]:8725 \
   -frame-version 2 \
   -shard-bits 2 \
   -subtrees 8 \
@@ -103,7 +103,7 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 # Connect to the proxy TCP ingress and periodically announce all subtree IDs
 # in the pool to the GroupSubtreeDataAnnounce control-plane multicast group.
 subtx-gen \
-  -addr [fd20::2]:9000 \
+  -addr [fd20::2]:8725 \
   -subtrees 8 \
   -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
@@ -126,7 +126,7 @@ subtrees. This produces a visible ramp in dashboard time-series and is used by
 # Announce 1 new subtree every 75s (8 subtrees → full coverage after ~10 min).
 # Re-announce every 12s to keep TTL=90s entries alive.
 subtx-gen \
-  -addr [fd20::2]:9000 \
+  -addr [fd20::2]:8725 \
   -subtrees 8 \
   -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \

@@ -3,7 +3,7 @@
 //
 // See README.md for the full flag set. Example:
 //
-//	subtx-gen -addr [fd20::2]:9000 -shard-bits 2 -subtrees 8 -pps 1000 -duration 10s
+//	subtx-gen -addr [fd20::2]:8725 -shard-bits 2 -subtrees 8 -pps 1000 -duration 10s
 package main
 
 import (
@@ -36,7 +36,7 @@ var Version = "dev"
 
 func main() {
 	var (
-		addr                  = flag.String("addr", "[::1]:9000", "target host:port (UDP)")
+		addr                  = flag.String("addr", "[::1]:8725", "target host:port (UDP)")
 		frameVer              = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
 		shardBits             = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")

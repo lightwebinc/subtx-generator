@@ -15,7 +15,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9000` | Target `host:port` for UDP frame sending |
+| `-addr` | `[::1]:8725` | Target `host:port` for UDP frame sending |
 | `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header) |
 | `-shard-bits` | `2` | Informational: shard-bits the proxy uses (for predicted-group diagnostic logging) |
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |
