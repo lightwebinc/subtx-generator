@@ -42,7 +42,7 @@ func main() {
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
 		subtreeSeed           = flag.String("subtree-seed", "subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
 		pps                   = flag.Int("pps", 1000, "target packets per second (0 = unlimited)")
-		duration              = flag.Duration("duration", 10*time.Second, "runtime (0 = until count reached or SIGINT)")
+		duration              = flag.Duration("duration", 0, "max runtime (0 = until -count reached or SIGINT; if >0, stops at min(count,duration))")
 		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
 		workers               = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
 		payloadSize           = flag.Int("payload-size", 512, "random transaction payload size in bytes")

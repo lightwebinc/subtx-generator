@@ -119,6 +119,7 @@ type Runner struct {
 	alloc *seq.Allocator
 	pfa   *seq.PerFlowAllocator // active when GapEnabled to inject per-flow gaps
 
+	issued atomic.Uint64 // tokens issued by the dispatcher; gates Count exactly
 	sent   atomic.Uint64
 	bytes  atomic.Uint64
 	errors atomic.Uint64
@@ -189,7 +190,11 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 			if err := runCtx.Err(); err != nil {
 				return
 			}
-			if r.cfg.Count > 0 && r.sent.Load() >= r.cfg.Count {
+			// Gate on tokens already issued (not on frames sent): a worker
+			// increments sent only after the write completes, so gating on
+			// sent races the dispatcher ahead and over-issues, letting
+			// workers overshoot Count. Issuing exactly Count tokens caps it.
+			if r.cfg.Count > 0 && r.issued.Load() >= r.cfg.Count {
 				return
 			}
 			if !pacer.Wait() {
@@ -197,6 +202,7 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 			}
 			select {
 			case tokens <- struct{}{}:
+				r.issued.Add(1)
 			case <-runCtx.Done():
 				return
 			}
@@ -281,9 +287,9 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			}
 		}
 
-		if r.cfg.Count > 0 && r.sent.Load() >= r.cfg.Count {
-			return
-		}
+		// Each token corresponds to exactly one frame the dispatcher has
+		// already counted against Count (via r.issued), so every received
+		// token must be processed; no per-worker Count re-check here.
 
 		// Random payload (format chosen per Config.PayloadFormat).
 		useEF := false
@@ -353,6 +359,9 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		n, err := myframe.Encode(r.cfg.FrameVersion, f, buf)
 		if err != nil {
 			r.errors.Add(1)
+			// Token spent without a successful send; release the Count slot
+			// so the dispatcher reissues and we still emit exactly Count.
+			r.issued.Add(^uint64(0))
 			continue
 		}
 		var werr error
@@ -367,6 +376,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			if errors.Is(werr, net.ErrClosed) {
 				return
 			}
+			r.issued.Add(^uint64(0)) // release slot; see Encode-error note above
 			continue
 		}
 		r.sent.Add(1)

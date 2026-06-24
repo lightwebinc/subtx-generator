@@ -21,7 +21,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |
 | `-subtree-seed` | `subtx-generator-default` | Seed for subtree ID pool derivation; plain string or hex |
 | `-pps` | `1000` | Target packets per second (0 = unlimited) |
-| `-duration` | `10s` | Run time (0 = run until `-count` reached or SIGINT) |
+| `-duration` | `0` | Max run time. `0` (default) runs until `-count` is reached or SIGINT; if `>0`, stops at whichever of count or duration comes first |
 | `-count` | `0` | Stop after N frames (0 = unlimited) |
 | `-workers` | `runtime.NumCPU()` | Worker goroutine count (0 = NumCPU) |
 | `-payload-size` | `512` | Random transaction payload size in bytes |
