@@ -9,7 +9,9 @@ path of `shard-listener` and `retry-endpoint`.
 
 It also provides three standalone tools — `send-block-announce`, `send-subtree-data`, and
 `send-anchor-frame` — for injecting BRC-131, BRC-132, and BRC-134 control-plane frames into
-`shard-proxy` via TCP.
+`shard-proxy`. `send-block-announce` and `send-subtree-data` use the proxy TCP ingress;
+`send-anchor-frame` sends UDP by default (matching the BRC-124/128 data path) with an
+optional `-tcp` flag.
 
 `subtx-generator` is a **test tool, not a production component**. It sends frames
 only; it never joins multicast groups or receives frames.
@@ -33,7 +35,7 @@ subtx-generator (send-subtree-data)
 shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
 
 subtx-generator (send-anchor-frame)
-      │  BRC-134 frames (TCP, port 9002)
+      │  BRC-134 frames (UDP, port 8725 default; -tcp → TCP, port 9002)
       ▼
 shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 ```
@@ -152,8 +154,10 @@ cycled frame-by-frame. When zero, a fresh random SubtreeID is used per frame.
 
 ## send-anchor-frame
 
-`send-anchor-frame` connects to the proxy TCP ingress and sends BRC-134 anchor transaction
-frames (`FrameVerV6`). Anchor frames carry a chain root and are routed to `GroupBlockBroadcast`
+`send-anchor-frame` sends BRC-134 anchor transaction frames (`FrameVerV6`) to the proxy.
+It defaults to UDP on `[::1]:8725` (the same ingress the BRC-124/128 data path uses); pass
+`-tcp` to use the proxy's TCP ingress instead (`-addr [host]:9002` in that mode). Anchor
+frames carry a chain root and are routed to `GroupBlockBroadcast`
 by the proxy, with HashKey derived against the virtual `groupIdx = 0xFFF9` for independent
 flow accounting (label `brc134`).
 
