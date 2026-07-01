@@ -160,4 +160,4 @@ flow accounting (label `brc134`).
 `HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
 `processAnchorFrame` path and the retry-endpoint anchor cache + retransmit flow. Used by
 integration scenarios 36 (delivery) and 37 (retransmit) in `multicast-test` (`vm-lab/scenarios/`). See
-[bsv-multicast/docs/brc-134-anchor-transactions.md](../../../bsv-multicast/docs/brc-134-anchor-transactions.md).
+[bsv-multicast/docs/brc-134-anchor-transactions.md](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/brc-134-anchor-transactions.md).
