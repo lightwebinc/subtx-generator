@@ -70,7 +70,7 @@ func TestRunCountWithZeroDuration(t *testing.T) {
 		FrameVersion: 2,
 		Workers:      4,
 		PPS:          0, // unlimited: count is the only stop condition
-		Duration:    0, // run until Count is reached
+		Duration:     0, // run until Count is reached
 		Count:        want,
 		PayloadSize:  256,
 	}
