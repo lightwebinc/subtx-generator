@@ -90,12 +90,21 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 
 ## send-block-announce
 
-Connects to the proxy TCP ingress and sends BRC-131 block control frame pairs
+Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 (BlockAnnounce + CoinbaseTx) for integration testing.
+
+> **Miner-tier gate:** BRC-131/132 frames are privileged. Point `-addr` at the
+> proxy's **miner TCP ingress** (`-miner-tcp-listen-port`, conventionally
+> `9000`) or run the proxy with `-tx-accept-privileged` — the consumer TCP
+> ingress (`:9002`, the flag default) silently drops these frames on a
+> default-configured proxy. See the
+> [shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate).
+> Anchor frames (`send-anchor-frame`, BRC-134) and BRC-127 SubtreeGroupAnnounce
+> remain ungated.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`); target the miner ingress (`:9000`) — see gate note above |
 | `-blocks` | `10` | Number of simulated blocks to announce |
 | `-subtrees` | `4` | Subtree hashes per BlockAnnounce frame |
 | `-interval` | `100ms` | Delay between successive block pairs |
@@ -109,15 +118,32 @@ with a random coinbase transaction and its SHA256d as ContentID.
 
 ## send-subtree-data
 
-Connects to the proxy TCP ingress and sends BRC-132 subtree data frames for integration
-testing.
+Connects to the proxy over TCP and sends BRC-132 subtree data frames for integration
+testing. BRC-132 frames are privileged — the miner-tier gate note under
+[send-block-announce](#send-block-announce) applies here too.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`); target the miner ingress (`:9000`) — see gate note above |
 | `-frames` | `20` | Number of BRC-132 frames to send |
 | `-msg-type` | `hashes` | Payload type: `hashes` (hashes-only, 32 bytes/node) or `full` (full-nodes, 48 bytes/node) |
 | `-nodes` | `16` | Number of subtree nodes per frame |
 | `-payload-size` | `0` | Override total payload size in bytes (0 = derived from `-nodes` × node size) |
 | `-subtree-count` | `0` | Unique subtree IDs to cycle through (0 = fresh random ID per frame) |
 | `-interval` | `50ms` | Delay between frames |
+
+---
+
+## send-anchor-frame
+
+Sends BRC-134 anchor transaction frames (`FrameVerV6`) to the proxy — UDP by default
+(matching the BRC-124/128 data path), or TCP with `-tcp`. Anchor frames are **not**
+subject to the miner-tier ingress gate; the consumer ingress accepts them.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-addr` | `[::1]:8725` | Proxy address (`host:port`); UDP by default |
+| `-count` | `10` | Number of anchor frames to send |
+| `-payload-size` | `256` | Raw anchor tx payload size in bytes |
+| `-interval` | `50ms` | Delay between frames |
+| `-tcp` | `false` | Send over TCP instead of UDP (use the proxy TCP ingress, e.g. `[::1]:9002`) |

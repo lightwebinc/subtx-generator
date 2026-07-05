@@ -9,9 +9,15 @@ path of `shard-listener` and `retry-endpoint`.
 
 It also provides three standalone tools — `send-block-announce`, `send-subtree-data`, and
 `send-anchor-frame` — for injecting BRC-131, BRC-132, and BRC-134 control-plane frames into
-`shard-proxy`. `send-block-announce` and `send-subtree-data` use the proxy TCP ingress;
+`shard-proxy`. `send-block-announce` and `send-subtree-data` send over TCP and emit
+**privileged** frames: they must target the proxy's miner TCP ingress
+(`-miner-tcp-listen-port`, conventionally `9000`) or a proxy started with
+`-tx-accept-privileged` — the consumer TCP ingress (`:9002`) silently drops
+BRC-131/132 by default (see the
+[shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate)).
 `send-anchor-frame` sends UDP by default (matching the BRC-124/128 data path) with an
-optional `-tcp` flag.
+optional `-tcp` flag; anchor frames (BRC-134) and BRC-127 SubtreeGroupAnnounce
+remain ungated.
 
 `subtx-generator` is a **test tool, not a production component**. It sends frames
 only; it never joins multicast groups or receives frames.
@@ -25,12 +31,12 @@ subtx-generator (subtx-gen)
 shard-proxy  ──multicast──►  shard-listener
 
 subtx-generator (send-block-announce)
-      │  BRC-131 frames (TCP, port 9002)
+      │  BRC-131 frames (TCP, miner ingress port 9000)
       ▼
 shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 
 subtx-generator (send-subtree-data)
-      │  BRC-132 frames (TCP, port 9002)
+      │  BRC-132 frames (TCP, miner ingress port 9000)
       ▼
 shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
 
@@ -130,7 +136,9 @@ scaling scenarios.
 
 ## send-block-announce
 
-`send-block-announce` connects to the proxy TCP ingress and sends pairs of BRC-131 frames:
+`send-block-announce` connects to the proxy's miner TCP ingress (or a
+`-tx-accept-privileged` proxy — see the gate note in the Overview) and sends pairs of
+BRC-131 frames:
 
 1. **BlockAnnounce** (MsgType `0x01`): carries a random 80-byte block header, the block
    hash as ContentID (`SHA256d(blockHeader)`), and `subtrees` random subtree hashes appended
@@ -143,8 +151,10 @@ scaling scenarios.
 
 ## send-subtree-data
 
-`send-subtree-data` connects to the proxy TCP ingress and sends BRC-132 frames with
-configurable `MsgType` (hashes-only or full-nodes), node count, and subtree ID pool.
+`send-subtree-data` connects to the proxy's miner TCP ingress (or a
+`-tx-accept-privileged` proxy — see the gate note in the Overview) and sends BRC-132
+frames with configurable `MsgType` (hashes-only or full-nodes), node count, and subtree
+ID pool.
 
 When `-subtree-count > 0`, a pool of that many random subtree IDs is pre-generated and
 cycled frame-by-frame. When zero, a fresh random SubtreeID is used per frame.

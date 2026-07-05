@@ -88,7 +88,7 @@ for the full design.
 
 ```bash
 # Permanent gap — every 500th seq number is skipped; listener reports
-# bsl_gaps_detected_total and (after NACK retries exhausted) bsl_nacks_unrecovered_total.
+# bsl_gaps_detected_total and (after NACK retries exhausted) bsl_gaps_unrecovered_total.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
 # Delayed retransmit — listener sees a gap, emits a NACK, and the
@@ -101,7 +101,7 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 
 ```bash
 # Connect to the proxy TCP ingress and periodically announce all subtree IDs
-# in the pool to the GroupSubtreeDataAnnounce control-plane multicast group.
+# in the pool to the GroupSubtreeGroupAnnounce control-plane multicast group.
 subtx-gen \
   -addr [fd20::2]:8725 \
   -subtrees 8 \
@@ -169,6 +169,14 @@ internal/sender/          — worker pool driving net.UDPConn per worker
 internal/announce/        — BRC-127 SubtreeGroupAnnounce TCP sender
 ```
 
+> **Miner-tier gate:** `send-block-announce` and `send-subtree-data` emit
+> privileged BRC-131/132 frames — point them at the proxy's **miner TCP
+> ingress** (`-miner-tcp-listen-port`, conventionally `:9000`) or a proxy
+> started with `-tx-accept-privileged`; the consumer TCP ingress (`:9002`)
+> silently drops these frames by default. Anchors (`send-anchor-frame`,
+> BRC-134) and BRC-127 SubtreeGroupAnnounce stay ungated. See the
+> [shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate).
+
 See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.
 
 ## Container image
@@ -180,7 +188,7 @@ containing all four binaries:
 /usr/local/bin/subtx-gen             (continuous BRC-124/BRC-128 frame generator)
 /usr/local/bin/send-anchor-frame     (one-shot BRC-134 anchor)
 /usr/local/bin/send-block-announce   (one-shot BRC-131 announce)
-/usr/local/bin/send-subtree-data     (one-shot BRC-127 subtree-data)
+/usr/local/bin/send-subtree-data     (one-shot BRC-132 subtree-data)
 ```
 
 **No `ENTRYPOINT` is set** — the consumer (Helm chart `mode` selector,
@@ -199,7 +207,7 @@ A Kubernetes Helm chart is published from a dedicated chart repository:
   helm repo add bsg https://lightwebinc.github.io/subtx-generator-helm
   helm install gen bsg/subtx-generator --set mode=subtx-gen
   ```
-- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator --version 0.1.0`
+- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator --version 0.2.3`
 
 The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (`subtx-gen` | `send-anchor-frame` | `send-block-announce` | `send-subtree-data`). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
 
