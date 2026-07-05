@@ -207,7 +207,7 @@ A Kubernetes Helm chart is published from a dedicated chart repository:
   helm repo add bsg https://lightwebinc.github.io/subtx-generator-helm
   helm install gen bsg/subtx-generator --set mode=subtx-gen
   ```
-- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator --version 0.2.3`
+- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator --version 0.3.0`
 
 The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (`subtx-gen` | `send-anchor-frame` | `send-block-announce` | `send-subtree-data`). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
 
