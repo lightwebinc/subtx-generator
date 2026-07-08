@@ -1,6 +1,6 @@
 module github.com/lightwebinc/subtx-generator
 
-go 1.25.11
+go 1.25.12
 
 require (
 	github.com/lightwebinc/shard-common v0.14.3
