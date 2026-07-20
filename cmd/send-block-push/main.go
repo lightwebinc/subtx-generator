@@ -182,8 +182,8 @@ func buildBlock(rng *rand.ChaCha8, txb *tx.Builder, subtrees, coinbaseSize, bump
 	obj = appendU64(obj, uint64(subtrees))        // SubtreeCount
 	obj = append(obj, roots...)
 	obj = append(obj, coinbase...)
-	obj = appendU64(obj, height)             // Height
-	obj = appendU64(obj, uint64(len(bump)))  // CoinbaseBUMPLen
+	obj = appendU64(obj, height)            // Height
+	obj = appendU64(obj, uint64(len(bump))) // CoinbaseBUMPLen
 	obj = append(obj, bump...)
 	return obj, blockHash, cbTxID
 }
