@@ -1,6 +1,6 @@
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/lightwebinc/shard-common v0.17.0 h1:ZYVEBsivli96Fa0hRlJ64NLnFAFxVyjv0Ejhi1HWJkw=
-github.com/lightwebinc/shard-common v0.17.0/go.mod h1:vIZz8jpr7kanjs+0r+PafAdDTkQKVADNmspOU4FuuNQ=
+github.com/lightwebinc/shard-common v0.18.0 h1:kcGymIHT++huB61qFBrCzv/WPlW8xoT7JvVl5KjO03s=
+github.com/lightwebinc/shard-common v0.18.0/go.mod h1:vIZz8jpr7kanjs+0r+PafAdDTkQKVADNmspOU4FuuNQ=
 golang.org/x/sys v0.42.0 h1:omrd2nAlyT5ESRdCLYdm3+fMfNFE/+Rf4bDIQImRJeo=
 golang.org/x/sys v0.42.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
