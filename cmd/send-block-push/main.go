@@ -17,10 +17,13 @@
 // framed BRC-131 path of send-block-announce, which targeted the removed :9002
 // privileged multicast port and no longer has a proxy ingress.
 //
-// Headers are chained (each prevHash = the prior block hash) and random beyond
-// that — run the lab proxy WITHOUT -require-block-pow (PoW gate is opt-in/off by
-// default) so admission does not need a valid proof of work. Every object is
-// self-verified with objfmt.BlockSize before it is written.
+// Headers are chained (each prevHash = the prior block hash) and carry REAL
+// proof of work at the regtest-easy target 0x207fffff: the block-control gate
+// (-require-block-pow) is on by default on both proxy and listener, so the
+// nonce is ground until pow.CheckHeader passes (a couple of tries at that
+// difficulty). A header claiming 0x207fffff is still rejected by a fabric whose
+// floor is stricter — match -min-pow-bits to the network being driven. Every
+// object is self-verified with objfmt.BlockSize before it is written.
 //
 // Usage:
 //
@@ -43,10 +46,11 @@ import (
 
 	"github.com/lightwebinc/shard-common/logging"
 	"github.com/lightwebinc/shard-common/objfmt"
+	"github.com/lightwebinc/subtx-generator/internal/blockhdr"
 	"github.com/lightwebinc/subtx-generator/internal/tx"
 )
 
-const blockHeaderLen = 80
+const blockHeaderLen = blockhdr.Len
 
 func main() {
 	addr := flag.String("addr", "[::1]:8727", "proxy block push ingress address (host:port)")
@@ -157,10 +161,12 @@ func buildBlock(rng *rand.ChaCha8, txb *tx.Builder, subtrees, coinbaseSize, bump
 	mr := sha256.Sum256(mr1[:])
 	copy(hdr[36:68], mr[:])
 	binary.LittleEndian.PutUint32(hdr[68:72], uint32(1700000000+height)) // monotone stand-in time
-	binary.BigEndian.PutUint32(hdr[72:76], 0x207fffff)                   // regtest-easy bits
-	binary.LittleEndian.PutUint32(hdr[76:80], uint32(height))            // nonce
-	h1 := sha256.Sum256(hdr)
-	blockHash := sha256.Sum256(h1[:])
+	// nBits is serialised LITTLE-endian, like every other multi-byte header
+	// field — pow.NBits reads it that way. Writing it big-endian yields the
+	// compact value 0xffff7f20, whose sign bit is set, so CompactToTarget
+	// rejects it and EVERY announce fails -require-block-pow.
+	blockhdr.SetBits(hdr, blockhdr.BitsRegtest) // regtest-easy bits
+	blockHash := blockhdr.Grind(hdr, uint32(height))
 
 	// Inline coinbase (walkable BSV tx) + BUMP.
 	coinbase := txb.Build(nil, coinbaseSize)

@@ -19,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/lightwebinc/shard-common/logging"
+	"github.com/lightwebinc/subtx-generator/internal/blockhdr"
 	"net"
 	"os"
 	"time"
@@ -53,19 +54,20 @@ func main() {
 
 	sent := 0
 	for i := 0; i < *blocks; i++ {
-		// Build a random 80-byte block header (version, prevHash, merkleRoot,
-		// time, bits, nonce — random bytes suffice for testing).
+		// Build an 80-byte block header. Version/prevHash/merkleRoot/time may be
+		// arbitrary, but nBits and the nonce may NOT: the block-control gate
+		// (-require-block-pow, default ON) runs a real pow.CheckHeader, so a
+		// fully random header is dropped as failing proof-of-work and the
+		// announce never reaches a listener.
 		var blockHdr [blockHeaderLen]byte
 		mustRand(blockHdr[:])
-
-		// Block hash = SHA256d(blockHeader).
-		h1 := sha256.Sum256(blockHdr[:])
-		blockHash := sha256.Sum256(h1[:])
+		blockhdr.SetBits(blockHdr[:], blockhdr.BitsRegtest)
+		blockHash := blockhdr.Grind(blockHdr[:], uint32(i))
 
 		// Random coinbase transaction payload.
 		coinbaseTx := make([]byte, 128+i%64) // vary size slightly
 		mustRand(coinbaseTx)
-		h1 = sha256.Sum256(coinbaseTx)
+		h1 := sha256.Sum256(coinbaseTx)
 		coinbaseTxID := sha256.Sum256(h1[:])
 
 		// Random subtree hashes.
