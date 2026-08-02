@@ -7,14 +7,17 @@ It generates random BRC-124/BRC-128 UDP frames at configurable rates, with contr
 subtree ID assignment and optional sequence gap injection to exercise the NACK/retransmission
 path of `shard-listener` and `retry-endpoint`.
 
-It also provides three standalone tools — `send-block-announce`, `send-subtree-data`, and
-`send-anchor-frame` — for injecting BRC-131, BRC-132, and BRC-134 control-plane frames into
-`shard-proxy`. `send-block-announce` and `send-subtree-data` send over TCP and emit
-**privileged** frames: they must target the proxy's miner TCP ingress
-(`-miner-tcp-listen-port`, conventionally `9000`) or a proxy started with
-`-tx-accept-privileged` — the consumer TCP ingress (`:9002`) silently drops
-BRC-131/132 by default (see the
-[shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate)).
+It also provides five standalone tools — `send-block-announce`, `send-subtree-data`,
+`send-anchor-frame`, `send-subtree-push`, and `send-block-push` — for injecting BRC-131,
+BRC-132, BRC-134, BRC-143, and BRC-144 frames into `shard-proxy`.
+`send-block-announce` and `send-subtree-data` send **privileged** BRC-131/132 multicast
+frames over TCP: the proxy's miner TCP ingress (`-miner-tcp-listen-port`) and
+`-tx-accept-privileged` were removed (2026-07-07), so these legacy senders work only
+against legacy/dev setups that drive a privileged ingress class — the transaction
+ingress silently drops BRC-131/132 (see the
+[shard-proxy transaction-only ingress](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated)).
+The current path is the BRC-143/144 push lanes: `send-subtree-push` (→ 8726) and
+`send-block-push` (→ 8727).
 `send-anchor-frame` sends UDP by default (matching the BRC-124/128 data path) with an
 optional `-tcp` flag; anchor frames (BRC-134) and BRC-127 SubtreeGroupAnnounce
 remain ungated.
@@ -31,17 +34,27 @@ subtx-generator (subtx-gen)
 shard-proxy  ──multicast──►  shard-listener
 
 subtx-generator (send-block-announce)
-      │  BRC-131 frames (TCP, miner ingress port 9000)
+      │  BRC-131 frames (TCP — legacy; miner port removed, use send-block-push)
       ▼
 shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 
 subtx-generator (send-subtree-data)
-      │  BRC-132 frames (TCP, miner ingress port 9000)
+      │  BRC-132 frames (TCP — legacy; miner port removed, use send-subtree-push)
       ▼
 shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
 
 subtx-generator (send-anchor-frame)
-      │  BRC-134 frames (UDP, port 8725 default; -tcp → TCP, port 9002)
+      │  BRC-134 frames (UDP, port 8725 default; -tcp → the proxy's TCP ingress)
+      ▼
+shard-proxy  ──GroupBlockBroadcast──►  shard-listener
+
+subtx-generator (send-subtree-push)
+      │  BRC-143 subtree push objects (TCP, lane 8726)
+      ▼
+shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
+
+subtx-generator (send-block-push)
+      │  BRC-144 block push objects (TCP, lane 8727)
       ▼
 shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 ```
@@ -54,6 +67,8 @@ subtx-generator/
   cmd/send-block-announce/ Standalone BRC-131 sender (BlockAnnounce + CoinbaseTx pairs)
   cmd/send-subtree-data/   Standalone BRC-132 sender (subtree node data)
   cmd/send-anchor-frame/   Standalone BRC-134 sender (anchor transaction chain root)
+  cmd/send-subtree-push/   Standalone BRC-143 subtree push sender (TCP lane 8726)
+  cmd/send-block-push/     Standalone BRC-144 block push sender (TCP lane 8727)
   internal/tx/             Random BSV-shaped transaction payload builder
   internal/subtree/        Deterministic subtree-ID pool (seed → N stable 32-byte IDs)
   internal/seq/            Shared atomic sequence allocator with gap injection
@@ -61,6 +76,7 @@ subtx-generator/
   internal/rate/           Token-bucket pacer (smooth at ≤1 kpps, burst mode above)
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
   internal/announce/       BRC-127 SubtreeGroupAnnounce TCP sender
+  internal/blockhdr/       Synthetic PoW-valid 80-byte block-header builder
 ```
 
 ## Frame Generation (subtx-gen)
@@ -136,9 +152,10 @@ scaling scenarios.
 
 ## send-block-announce
 
-`send-block-announce` connects to the proxy's miner TCP ingress (or a
-`-tx-accept-privileged` proxy — see the gate note in the Overview) and sends pairs of
-BRC-131 frames:
+`send-block-announce` connects to a proxy TCP ingress that accepts privileged frames
+(legacy/dev setups only — the miner TCP ingress and `-tx-accept-privileged` were
+removed; see the gate note in the Overview. The current path is `send-block-push` →
+8727) and sends pairs of BRC-131 frames:
 
 1. **BlockAnnounce** (MsgType `0x01`): carries a random 80-byte block header, the block
    hash as ContentID (`SHA256d(blockHeader)`), and `subtrees` random subtree hashes appended
@@ -151,8 +168,10 @@ BRC-131 frames:
 
 ## send-subtree-data
 
-`send-subtree-data` connects to the proxy's miner TCP ingress (or a
-`-tx-accept-privileged` proxy — see the gate note in the Overview) and sends BRC-132
+`send-subtree-data` connects to a proxy TCP ingress that accepts privileged frames
+(legacy/dev setups only — the miner TCP ingress and `-tx-accept-privileged` were
+removed; see the gate note in the Overview. The current path is `send-subtree-push` →
+8726) and sends BRC-132
 frames with configurable `MsgType` (hashes-only or full-nodes), node count, and subtree
 ID pool.
 
@@ -166,12 +185,13 @@ cycled frame-by-frame. When zero, a fresh random SubtreeID is used per frame.
 
 `send-anchor-frame` sends BRC-134 anchor transaction frames (`FrameVerV6`) to the proxy.
 It defaults to UDP on `[::1]:8725` (the same ingress the BRC-124/128 data path uses); pass
-`-tcp` to use the proxy's TCP ingress instead (`-addr [host]:9002` in that mode). Anchor
+`-tcp` to use the proxy's TCP ingress instead (point `-addr` at its `-tcp-listen-port`). Anchor
 frames carry a chain root and are routed to `GroupBlockBroadcast`
 by the proxy, with HashKey derived against the virtual `groupIdx = 0xFFF9` for independent
 flow accounting (label `brc134`).
 
 `HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
 `processAnchorFrame` path and the retry-endpoint anchor cache + retransmit flow. Used by
-integration scenarios 36 (delivery) and 37 (retransmit) in `multicast-test` (`vm-lab/scenarios/`). See
+integration scenarios 36 (delivery) and 37 (retransmit) in
+[multicast-test SCENARIOS.md](https://github.com/lightwebinc/multicast-test/blob/main/SCENARIOS.md). See
 [bsv-multicast/docs/brc-134-anchor-transactions.md](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/brc-134-anchor-transactions.md).

@@ -120,7 +120,7 @@ the group incrementally. The sender starts with zero active subtrees and adds
 `phase-size` more every `phase-interval`, up to the full pool. The re-announce
 ticker (`-announce-interval`) continues to fire to refresh TTLs of already-active
 subtrees. This produces a visible ramp in dashboard time-series and is used by
-[scenario 21](https://github.com/lightwebinc/multicast-test/tree/main/vm-lab/scenarios/21-subtree-group-ramp).
+scenario 21 in [multicast-test SCENARIOS.md](https://github.com/lightwebinc/multicast-test/blob/main/SCENARIOS.md).
 
 ```bash
 # Announce 1 new subtree every 75s (8 subtrees → full coverage after ~10 min).
@@ -157,9 +157,11 @@ subtx-gen -subtrees 8 -subtree-seed 'multicast-lab-bsv' -print-subtrees
 
 ```
 cmd/subtx-gen/            — CLI entry point (BRC-124/128 frame generator)
-cmd/send-block-announce/  — BRC-131 block announce sender (TCP)
-cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP)
+cmd/send-block-announce/  — BRC-131 block announce sender (TCP, legacy)
+cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP, legacy)
 cmd/send-anchor-frame/    — BRC-134 anchor transaction sender (UDP default, -tcp opt)
+cmd/send-subtree-push/    — BRC-143 subtree push sender (TCP, lane 8726)
+cmd/send-block-push/      — BRC-144 block push sender (TCP, lane 8727)
 internal/tx/              — random BSV-shaped tx payload builder
 internal/subtree/         — deterministic subtree-ID pool
 internal/seq/             — shared seq allocator + gap injector
@@ -167,15 +169,19 @@ internal/frame/           — v1/v2 encoder wrapper around shard-common
 internal/rate/            — token-bucket pacer (smooth / burst)
 internal/sender/          — worker pool driving net.UDPConn per worker
 internal/announce/        — BRC-127 SubtreeGroupAnnounce TCP sender
+internal/blockhdr/        — synthetic PoW-valid 80-byte block-header builder
 ```
 
 > **Miner-tier gate:** `send-block-announce` and `send-subtree-data` emit
-> privileged BRC-131/132 frames — point them at the proxy's **miner TCP
-> ingress** (`-miner-tcp-listen-port`, conventionally `:9000`) or a proxy
-> started with `-tx-accept-privileged`; the consumer TCP ingress (`:9002`)
-> silently drops these frames by default. Anchors (`send-anchor-frame`,
-> BRC-134) and BRC-127 SubtreeGroupAnnounce stay ungated. See the
-> [shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate).
+> privileged BRC-131/132 multicast frames. The proxy's miner TCP ingress
+> (`-miner-tcp-listen-port`) and `-tx-accept-privileged` were **removed
+> (2026-07-07)** — these legacy senders work only against legacy/dev setups
+> that drive a privileged ingress class; the transaction ingress silently
+> drops their frames. The current path is the BRC-143/144 push lanes:
+> `send-subtree-push` → 8726, `send-block-push` → 8727. Anchors
+> (`send-anchor-frame`, BRC-134) and BRC-127 SubtreeGroupAnnounce stay
+> ungated. See the
+> [shard-proxy transaction-only ingress](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
 
 See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](docs/configuration.md) for detailed documentation.
 

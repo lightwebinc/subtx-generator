@@ -6,7 +6,7 @@
 #   - /usr/local/bin/subtx-gen           (continuous BRC-124/BRC-128 frame generator)
 #   - /usr/local/bin/send-anchor-frame   (one-shot BRC-134 anchor)
 #   - /usr/local/bin/send-block-announce (one-shot BRC-131 announce)
-#   - /usr/local/bin/send-subtree-data   (one-shot BRC-127 subtree-data)
+#   - /usr/local/bin/send-subtree-data   (one-shot BRC-132 subtree-data)
 #
 # No ENTRYPOINT is set: the consuming workload (Helm chart, docker run --entrypoint)
 # selects which binary to invoke.

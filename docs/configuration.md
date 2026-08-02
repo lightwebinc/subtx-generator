@@ -1,7 +1,8 @@
 # subtx-generator — Configuration Reference
 
 All parameters are accepted as CLI flags only, with one exception: every binary
-(`subtx-gen`, `send-block-announce`, `send-subtree-data`, `send-anchor-frame`)
+(`subtx-gen`, `send-block-announce`, `send-subtree-data`, `send-anchor-frame`,
+`send-subtree-push`, `send-block-push`)
 reads the `LOG_FORMAT` environment variable (`text` default | `json`) for
 unified structured logging via `shard-common/logging` — see the
 [canonical logging doc](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
@@ -93,18 +94,19 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 (BlockAnnounce + CoinbaseTx) for integration testing.
 
-> **Miner-tier gate:** BRC-131/132 frames are privileged. Point `-addr` at the
-> proxy's **miner TCP ingress** (`-miner-tcp-listen-port`, conventionally
-> `9000`) or run the proxy with `-tx-accept-privileged` — the consumer TCP
-> ingress (`:9002`, the flag default) silently drops these frames on a
-> default-configured proxy. See the
-> [shard-proxy miner-tier ingress gate](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#miner-tier-ingress-gate).
+> **Miner-tier gate:** BRC-131/132 multicast frames are privileged. The proxy's
+> miner TCP ingress (`-miner-tcp-listen-port`) and `-tx-accept-privileged` were
+> **removed (2026-07-07)** — this legacy sender works only against legacy/dev
+> setups that drive a privileged ingress class; the transaction ingress
+> silently drops these frames. The current path is the BRC-143/144 push lanes
+> (`send-subtree-push` → 8726, `send-block-push` → 8727). See the
+> [shard-proxy transaction-only ingress](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
 > Anchor frames (`send-anchor-frame`, BRC-134) and BRC-127 SubtreeGroupAnnounce
 > remain ungated.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`); target the miner ingress (`:9000`) — see gate note above |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames. See gate note above |
 | `-blocks` | `10` | Number of simulated blocks to announce |
 | `-subtrees` | `4` | Subtree hashes per BlockAnnounce frame |
 | `-interval` | `100ms` | Delay between successive block pairs |
@@ -120,11 +122,12 @@ with a random coinbase transaction and its SHA256d as ContentID.
 
 Connects to the proxy over TCP and sends BRC-132 subtree data frames for integration
 testing. BRC-132 frames are privileged — the miner-tier gate note under
-[send-block-announce](#send-block-announce) applies here too.
+[send-block-announce](#send-block-announce) applies here too; the current path
+is `send-subtree-push` → 8726.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`); target the miner ingress (`:9000`) — see gate note above |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames. See gate note above |
 | `-frames` | `20` | Number of BRC-132 frames to send |
 | `-msg-type` | `hashes` | Payload type: `hashes` (hashes-only, 32 bytes/node) or `full` (full-nodes, 48 bytes/node) |
 | `-nodes` | `16` | Number of subtree nodes per frame |
@@ -146,4 +149,44 @@ subject to the miner-tier ingress gate; the consumer ingress accepts them.
 | `-count` | `10` | Number of anchor frames to send |
 | `-payload-size` | `256` | Raw anchor tx payload size in bytes |
 | `-interval` | `50ms` | Delay between frames |
-| `-tcp` | `false` | Send over TCP instead of UDP (use the proxy TCP ingress, e.g. `[::1]:9002`) |
+| `-tcp` | `false` | Send over TCP instead of UDP (point `-addr` at the proxy's `-tcp-listen-port`) |
+
+---
+
+## send-subtree-push
+
+Streams BRC-143 subtree push objects (header-stripped, self-delimiting) to the
+proxy's tunnel-bound subtree push lane (standard 8726) over TCP — the current
+path for miner subtree ingest. The proxy reframes each object into a BRC-132
+multicast frame.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-addr` | `[::1]:8726` | Proxy subtree push ingress address (`host:port`) |
+| `-interval` | `1s` | Delay between subtree objects |
+| `-count` | `0` | Stop after N objects (0 = until `-duration` / SIGINT) |
+| `-duration` | `0` | Stop after this long (0 = until `-count` / SIGINT) |
+| `-nodes` | `16` | Leaf node hashes per subtree |
+| `-coinbase-placeholder` | `true` | Set node[0] to the `0xFF`×32 coinbase placeholder (BRC-143 convention) |
+| `-seed` | `subtree-push` | PRNG seed (identifies this source for the delivery matrix) |
+| `-log-hashes` | `false` | Print every subtree root (for end-to-end hash compare) |
+
+---
+
+## send-block-push
+
+Streams BRC-144 block push objects to the proxy's tunnel-bound block push lane
+(standard 8727) over TCP — the current path for miner block ingest.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-addr` | `[::1]:8727` | Proxy block push ingress address (`host:port`) |
+| `-interval` | `9m` | Delay between block objects |
+| `-count` | `0` | Stop after N blocks (0 = until `-duration` / SIGINT) |
+| `-duration` | `0` | Stop after this long (0 = until `-count` / SIGINT) |
+| `-subtrees` | `4` | Subtree roots per block |
+| `-coinbase-size` | `200` | Inline coinbase transaction size in bytes |
+| `-bump-size` | `0` | Coinbase BUMP (BRC-74) byte length (0 = none) |
+| `-height-start` | `800000` | Block height of the first block |
+| `-seed` | `block-push` | PRNG seed (identifies this source for the delivery matrix) |
+| `-log-hashes` | `false` | Print every block hash (for end-to-end hash compare) |
