@@ -19,6 +19,8 @@ import (
 	"log/slog"
 
 	"github.com/lightwebinc/shard-common/logging"
+	"github.com/lightwebinc/shard-common/objfmt"
+	"github.com/lightwebinc/subtx-generator/internal/tx"
 	"net"
 	"os"
 	"time"
@@ -35,11 +37,23 @@ const (
 func main() {
 	addr := flag.String("addr", "[::1]:8725", "proxy address (host:port); UDP by default")
 	count := flag.Int("count", 10, "number of anchor frames to send")
-	payloadSize := flag.Int("payload-size", 256, "raw anchor tx payload size in bytes")
+	payloadSize := flag.Int("payload-size", 256, "exact anchor tx payload size in bytes (one valid raw tx of exactly this size)")
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")
 	useTCP := flag.Bool("tcp", false, "send over TCP instead of UDP")
 	flag.Parse()
 	logging.Init(logging.Options{Service: "subtx-generator", Level: slog.LevelInfo, Format: logging.ParseFormat(os.Getenv("LOG_FORMAT"))})
+
+	if *payloadSize < tx.MinRawSize {
+		fatalf("-payload-size must be >= %d (each anchor payload is exactly one valid raw tx; no padding)", tx.MinRawSize)
+	}
+
+	// Anchors are plain transactions on a tx-class lane: the payload must be
+	// one WALKABLE tx of exactly -payload-size bytes with the canonical TxID
+	// (objfmt.TxID), never random bytes — random bytes desync a downstream
+	// TCP objfmt stream and stamp an id no consumer ever derives.
+	var seed [32]byte
+	mustRand(seed[:])
+	txb := tx.New(seed)
 
 	var send func([]byte) error
 	if *useTCP {
@@ -69,11 +83,14 @@ func main() {
 	}
 
 	for i := 0; i < *count; i++ {
-		var txid [32]byte
-		mustRand(txid[:])
-
-		payload := make([]byte, *payloadSize)
-		mustRand(payload)
+		payload, err := txb.Build(nil, *payloadSize)
+		if err != nil {
+			fatalf("anchor tx build: %v", err)
+		}
+		txid, err := objfmt.TxID(payload)
+		if err != nil {
+			fatalf("anchor TxID: %v", err)
+		}
 
 		frame := encodeAnchorFrame(txid, payload)
 		if err := send(frame); err != nil {

@@ -162,7 +162,7 @@ cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP, legacy)
 cmd/send-anchor-frame/    — BRC-134 anchor transaction sender (UDP default, -tcp opt)
 cmd/send-subtree-push/    — BRC-143 subtree push sender (TCP, lane 8726)
 cmd/send-block-push/      — BRC-144 block push sender (TCP, lane 8727)
-internal/tx/              — random BSV-shaped tx payload builder
+internal/tx/              — exact-size walkable tx payload builder (raw + BRC-30 EF; never pads)
 internal/subtree/         — deterministic subtree-ID pool
 internal/seq/             — shared seq allocator + gap injector
 internal/frame/           — v1/v2 encoder wrapper around shard-common

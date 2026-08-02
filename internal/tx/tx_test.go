@@ -13,7 +13,10 @@ func TestBuilderShape(t *testing.T) {
 	sizes := []int{64, 128, 256, 512, 1024}
 	for _, size := range sizes {
 		buf := make([]byte, size)
-		out := b.Build(buf, size)
+		out, err := b.Build(buf, size)
+		if err != nil {
+			t.Fatalf("size=%d: %v", size, err)
+		}
 		if len(out) != size {
 			t.Fatalf("size=%d: got len %d", size, len(out))
 		}
@@ -33,19 +36,49 @@ func TestBuilderDeterministic(t *testing.T) {
 	b2 := New(seed)
 	buf1 := make([]byte, 256)
 	buf2 := make([]byte, 256)
-	o1 := b1.Build(buf1, 256)
-	o2 := b2.Build(buf2, 256)
+	o1, err1 := b1.Build(buf1, 256)
+	o2, err2 := b2.Build(buf2, 256)
+	if err1 != nil || err2 != nil {
+		t.Fatalf("Build: %v / %v", err1, err2)
+	}
 	if string(o1) != string(o2) {
 		t.Error("same seed produced different output")
 	}
 }
 
-func TestBuilderMinSize(t *testing.T) {
+func TestBuilderBelowMinErrors(t *testing.T) {
 	var seed [32]byte
 	b := New(seed)
-	buf := make([]byte, 20)
-	out := b.Build(buf, 4) // below min
-	if len(out) != 10 {
-		t.Errorf("got len %d want 10 (min)", len(out))
+	buf := make([]byte, 64)
+	for _, size := range []int{0, 4, 10, MinRawSize - 1} {
+		if _, err := b.Build(buf, size); err == nil {
+			t.Errorf("Build(%d) succeeded, want error (< MinRawSize %d)", size, MinRawSize)
+		}
+	}
+}
+
+func TestSplitSlackCoversAllTotals(t *testing.T) {
+	// Every slack in the canonical-varint boundary neighbourhoods (and a
+	// broad low range) must be exactly representable — the class of bug
+	// being fixed is a size that silently could not be represented.
+	check := func(s int) {
+		t.Helper()
+		shim, bulk, err := splitSlack(s)
+		if err != nil {
+			t.Fatalf("splitSlack(%d): %v", s, err)
+		}
+		got := shim + varintSize(shim) - 1 + bulk + varintSize(bulk) - 1
+		if got != s {
+			t.Fatalf("splitSlack(%d) = shim %d bulk %d → cost %d", s, shim, bulk, got)
+		}
+		if shim > 252 && varintSize(shim) != 1 {
+			t.Fatalf("splitSlack(%d): shim %d needs multi-byte varint", s, shim)
+		}
+	}
+	for s := 0; s <= 1024; s++ {
+		check(s)
+	}
+	for s := 65530; s <= 65550; s++ {
+		check(s)
 	}
 }

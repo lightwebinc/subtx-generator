@@ -25,8 +25,8 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-duration` | `0` | Max run time. `0` (default) runs until `-count` is reached or SIGINT; if `>0`, stops at whichever of count or duration comes first |
 | `-count` | `0` | Stop after N frames (0 = unlimited) |
 | `-workers` | `runtime.NumCPU()` | Worker goroutine count (0 = NumCPU) |
-| `-payload-size` | `512` | Random transaction payload size in bytes |
-| `-payload-format` | `brc124` | Payload encoding: `brc124` (raw tx), `brc128` (BRC-30 EF), or `mixed` |
+| `-payload-size` | `512` | Exact transaction payload size in bytes. Every payload is exactly one structurally valid tx of this size (sizing slack is absorbed inside the script fields, never as trailing padding — padding desyncs TCP objfmt streams). Minimum 75 for `brc128`/`mixed`, 60 for `brc124`; below-minimum sizes fail at startup |
+| `-payload-format` | `brc128` | Payload encoding: `brc128` (BRC-30 EF; default — the fabric is EF-native), `brc124` (raw tx; legacy/miner lanes), or `mixed`. The frame TxID is stamped canonically (`objfmt.TxID`, i.e. over the standard serialization — EF extras excluded) |
 | `-seq-start` | `1` | First sequence number |
 | `-seq-gap-every` | `0` | Inject a gap every N frames; 0 = disabled |
 | `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap |
@@ -114,7 +114,9 @@ Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 
 Each BlockAnnounce carries a random 80-byte block header with ContentID set to
 `SHA256d(blockHeader)`. When `-coinbase=true`, a CoinbaseTx frame follows immediately
-with a random coinbase transaction and its SHA256d as ContentID.
+with a structurally valid (walkable) coinbase transaction and its canonical TxID
+(`objfmt.TxID`) as ContentID — never random bytes, which would desync a
+downstream tx-class objfmt stream.
 
 ---
 
@@ -147,7 +149,7 @@ subject to the miner-tier ingress gate; the consumer ingress accepts them.
 |---|---|---|
 | `-addr` | `[::1]:8725` | Proxy address (`host:port`); UDP by default |
 | `-count` | `10` | Number of anchor frames to send |
-| `-payload-size` | `256` | Raw anchor tx payload size in bytes |
+| `-payload-size` | `256` | Exact anchor tx payload size in bytes — one structurally valid raw tx of exactly this size (min 60), TxID = `objfmt.TxID` |
 | `-interval` | `50ms` | Delay between frames |
 | `-tcp` | `false` | Send over TCP instead of UDP (point `-addr` at the proxy's `-tcp-listen-port`) |
 

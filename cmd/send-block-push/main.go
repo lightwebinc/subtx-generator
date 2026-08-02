@@ -70,8 +70,8 @@ func main() {
 	if *subtrees < 1 {
 		fatalf("-subtrees must be >= 1")
 	}
-	if *coinbaseSize < 10 {
-		fatalf("-coinbase-size must be >= 10")
+	if *coinbaseSize < tx.MinRawSize {
+		fatalf("-coinbase-size must be >= %d (one valid raw tx, exactly)", tx.MinRawSize)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -169,7 +169,10 @@ func buildBlock(rng *rand.ChaCha8, txb *tx.Builder, subtrees, coinbaseSize, bump
 	blockHash := blockhdr.Grind(hdr, uint32(height))
 
 	// Inline coinbase (walkable BSV tx) + BUMP.
-	coinbase := txb.Build(nil, coinbaseSize)
+	coinbase, err := txb.Build(nil, coinbaseSize)
+	if err != nil {
+		fatalf("coinbase build: %v", err)
+	}
 	cbTxID, err := objfmt.TxID(coinbase)
 	if err != nil {
 		fatalf("coinbase TxID: %v", err)

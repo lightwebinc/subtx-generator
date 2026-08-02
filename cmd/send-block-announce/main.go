@@ -12,14 +12,15 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"flag"
 	"fmt"
 	"log/slog"
 
 	"github.com/lightwebinc/shard-common/logging"
+	"github.com/lightwebinc/shard-common/objfmt"
 	"github.com/lightwebinc/subtx-generator/internal/blockhdr"
+	"github.com/lightwebinc/subtx-generator/internal/tx"
 	"net"
 	"os"
 	"time"
@@ -52,6 +53,14 @@ func main() {
 	defer func() { _ = conn.Close() }()
 	infof("connected to %s", *addr)
 
+	// Coinbase payloads are plain transactions: build one WALKABLE tx of the
+	// exact target size with the canonical TxID (objfmt.TxID), never random
+	// bytes — random bytes desync a downstream tx-class objfmt stream and
+	// stamp an id no consumer ever derives.
+	var seed [32]byte
+	mustRand(seed[:])
+	txb := tx.New(seed)
+
 	sent := 0
 	for i := 0; i < *blocks; i++ {
 		// Build an 80-byte block header. Version/prevHash/merkleRoot/time may be
@@ -64,11 +73,15 @@ func main() {
 		blockhdr.SetBits(blockHdr[:], blockhdr.BitsRegtest)
 		blockHash := blockhdr.Grind(blockHdr[:], uint32(i))
 
-		// Random coinbase transaction payload.
-		coinbaseTx := make([]byte, 128+i%64) // vary size slightly
-		mustRand(coinbaseTx)
-		h1 := sha256.Sum256(coinbaseTx)
-		coinbaseTxID := sha256.Sum256(h1[:])
+		// Walkable coinbase transaction payload (size varies slightly).
+		coinbaseTx, err := txb.Build(nil, 128+i%64)
+		if err != nil {
+			fatalf("block %d coinbase build: %v", i, err)
+		}
+		coinbaseTxID, err := objfmt.TxID(coinbaseTx)
+		if err != nil {
+			fatalf("block %d coinbase TxID: %v", i, err)
+		}
 
 		// Random subtree hashes.
 		subtreeHashes := make([][32]byte, *subtrees)

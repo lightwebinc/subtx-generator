@@ -45,8 +45,8 @@ func main() {
 		duration              = flag.Duration("duration", 0, "max runtime (0 = until -count reached or SIGINT; if >0, stops at min(count,duration))")
 		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
 		workers               = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
-		payloadSize           = flag.Int("payload-size", 512, "random transaction payload size in bytes")
-		payloadFormat         = flag.String("payload-format", "brc124", "payload encoding: brc124 (raw tx), brc128 (BRC-30 EF), or mixed")
+		payloadSize           = flag.Int("payload-size", 512, "exact transaction payload size in bytes (each payload is one valid tx of exactly this size; min 75 for brc128/mixed, 60 for brc124)")
+		payloadFormat         = flag.String("payload-format", "brc128", "payload encoding: brc128 (BRC-30 EF; default — the fabric is EF-native), brc124 (raw tx; legacy/miner lanes), or mixed")
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
 		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
 		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
@@ -120,6 +120,13 @@ func main() {
 		pf = sender.PayloadMixed
 	default:
 		fatalf("payload-format must be brc124, brc128, or mixed; got %q", *payloadFormat)
+	}
+
+	// Exact-size payload contract: every payload is exactly one valid tx of
+	// -payload-size bytes, so sizes below the format minimum are impossible.
+	if floor := pf.MinPayloadSize(); *payloadSize < floor {
+		fatalf("payload-size %d below %s minimum %d (each payload is exactly one valid tx; no padding)",
+			*payloadSize, pf, floor)
 	}
 
 	w := *workers

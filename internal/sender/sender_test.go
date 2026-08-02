@@ -6,8 +6,12 @@ import (
 	"testing"
 	"time"
 
+	common "github.com/lightwebinc/shard-common/frame"
+	"github.com/lightwebinc/shard-common/objfmt"
+
 	"github.com/lightwebinc/subtx-generator/internal/seq"
 	"github.com/lightwebinc/subtx-generator/internal/subtree"
+	"github.com/lightwebinc/subtx-generator/internal/tx"
 )
 
 func TestModeIotaValues(t *testing.T) {
@@ -97,4 +101,103 @@ func TestOpenMulticastEgress_NoBindSource(t *testing.T) {
 		t.Fatalf("openMulticastEgress(nil, nil): %v", err)
 	}
 	defer func() { _ = uc.Close() }()
+}
+
+// TestRunRejectsPayloadBelowFormatMinimum guards the exact-size contract: a
+// -payload-size below the format minimum must fail loudly, never pad.
+func TestRunRejectsPayloadBelowFormatMinimum(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		pf   PayloadFormat
+		size int
+	}{
+		{PayloadBRC124, tx.MinRawSize - 1},
+		{PayloadBRC128, tx.MinEFSize - 1},
+		{PayloadMixed, tx.MinEFSize - 1}, // mixed emits both formats → EF floor
+	}
+	for _, c := range cases {
+		cfg := Config{
+			Mode: ModeUnicast, Addr: "[::1]:9", FrameVersion: 2,
+			Workers: 1, Count: 1, PayloadSize: c.size, PayloadFormat: c.pf,
+		}
+		r := New(cfg, subtree.New(1, []byte("s")), seq.New(seq.Config{Start: 1}))
+		if _, err := r.Run(context.Background()); err == nil {
+			t.Errorf("format=%s size=%d: Run succeeded, want minimum-size error", c.pf, c.size)
+		}
+	}
+}
+
+// TestWireFramesCarryExactEFTxAndCanonicalTxID captures emitted datagrams and
+// asserts, per frame: the payload is EXACTLY one valid tx of the requested
+// size (the property whose violation desyncs TCP objfmt streams) and the
+// stamped TxID equals objfmt.TxID(payload) — the canonical id (ToStandard for
+// EF), matching what the proxy's bare-tx path stamps and consumers dedup on.
+func TestWireFramesCarryExactEFTxAndCanonicalTxID(t *testing.T) {
+	t.Parallel()
+
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("ListenPacket: %v", err)
+	}
+	defer func() { _ = pc.Close() }()
+
+	const (
+		count = 16
+		size  = 256
+	)
+	frames := make(chan []byte, count)
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, _, derr := pc.ReadFrom(buf)
+			if derr != nil {
+				close(frames)
+				return
+			}
+			frames <- append([]byte(nil), buf[:n]...)
+		}
+	}()
+
+	for _, pf := range []PayloadFormat{PayloadBRC128, PayloadBRC124, PayloadMixed} {
+		cfg := Config{
+			Mode: ModeUnicast, Addr: pc.LocalAddr().String(), FrameVersion: 2,
+			Workers: 2, Count: count, PayloadSize: size, PayloadFormat: pf,
+		}
+		r := New(cfg, subtree.New(4, []byte("wire-test")), seq.New(seq.Config{Start: 1}))
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if _, err := r.Run(ctx); err != nil {
+			cancel()
+			t.Fatalf("format=%s: Run: %v", pf, err)
+		}
+		cancel()
+
+		for i := 0; i < count; i++ {
+			var raw []byte
+			select {
+			case raw = <-frames:
+			case <-time.After(5 * time.Second):
+				t.Fatalf("format=%s: frame %d not received", pf, i)
+			}
+			f, derr := common.Decode(raw)
+			if derr != nil {
+				t.Fatalf("format=%s frame %d: decode: %v", pf, i, derr)
+			}
+			n, terr := objfmt.TxSize(f.Payload)
+			if terr != nil {
+				t.Fatalf("format=%s frame %d: objfmt.TxSize: %v", pf, i, terr)
+			}
+			if n != size || len(f.Payload) != size {
+				t.Fatalf("format=%s frame %d: payload len %d, tx walks %d, want exactly %d",
+					pf, i, len(f.Payload), n, size)
+			}
+			id, ierr := objfmt.TxID(f.Payload)
+			if ierr != nil {
+				t.Fatalf("format=%s frame %d: objfmt.TxID: %v", pf, i, ierr)
+			}
+			if id != f.TxID {
+				t.Fatalf("format=%s frame %d: stamped TxID %x != canonical objfmt.TxID %x",
+					pf, i, f.TxID[:8], id[:8])
+			}
+		}
+	}
 }

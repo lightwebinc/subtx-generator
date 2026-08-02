@@ -12,7 +12,6 @@ package sender
 import (
 	"context"
 	cryptorand "crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -26,6 +25,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	common "github.com/lightwebinc/shard-common/frame"
+	"github.com/lightwebinc/shard-common/objfmt"
 	"github.com/lightwebinc/shard-common/seqhash"
 	"github.com/lightwebinc/shard-common/shard"
 
@@ -42,17 +42,32 @@ import (
 type PayloadFormat int
 
 const (
-	// PayloadBRC124 emits BRC-12 raw transaction payloads (default).
-	// Frames carrying BRC-124 payloads are "BRC-124 frames".
+	// PayloadBRC124 emits BRC-12 raw transaction payloads (legacy/miner
+	// lanes). Frames carrying BRC-124 payloads are "BRC-124 frames".
 	PayloadBRC124 PayloadFormat = iota
-	// PayloadBRC128 emits BRC-30 Extended Format (EF) transaction payloads.
-	// Frames carrying EF payloads are "BRC-128 frames".
+	// PayloadBRC128 emits BRC-30 Extended Format (EF) transaction payloads
+	// (the CLI default — the fabric is EF-native). Frames carrying EF
+	// payloads are "BRC-128 frames".
 	PayloadBRC128
 	// PayloadMixed alternates between BRC-124 and BRC-128 payloads on a
 	// per-frame, per-worker basis. Used to verify infrastructure handles
 	// both formats coexisting on the same multicast group.
 	PayloadMixed
 )
+
+// MinPayloadSize returns the smallest valid -payload-size for p. Every
+// emitted payload is EXACTLY one structurally valid transaction (no trailing
+// padding — padding desyncs TCP objfmt streams), so the floor is the format's
+// minimum tx size. PayloadMixed emits both formats at one size and therefore
+// takes the larger (EF) floor.
+func (p PayloadFormat) MinPayloadSize() int {
+	switch p {
+	case PayloadBRC128, PayloadMixed:
+		return tx.MinEFSize
+	default:
+		return tx.MinRawSize
+	}
+}
 
 // String returns the canonical CLI/env spelling.
 func (p PayloadFormat) String() string {
@@ -167,6 +182,14 @@ func (r *Runner) groupIdx(txid [32]byte) uint32 {
 // Run blocks until ctx is canceled, Count is reached, or Duration elapses.
 // Returns the number of frames transmitted.
 func (r *Runner) Run(ctx context.Context) (uint64, error) {
+	// Exact-size payload contract: below the format minimum no valid tx of
+	// the requested size exists, so refuse loudly up front rather than let
+	// every worker fail (or worse, pad).
+	if floor := r.cfg.PayloadFormat.MinPayloadSize(); r.cfg.PayloadSize < floor {
+		return 0, fmt.Errorf("payload-size %d below %s minimum %d",
+			r.cfg.PayloadSize, r.cfg.PayloadFormat, floor)
+	}
+
 	// Derive a run deadline if Duration is set.
 	runCtx := ctx
 	if r.cfg.Duration > 0 {
@@ -300,17 +323,37 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			useEF = local%2 == 1
 		}
 		local++
+		var berr error
 		if useEF {
-			payload = builder.BuildEF(payload[:0:cap(payload)], r.cfg.PayloadSize)
+			payload, berr = builder.BuildEF(payload[:0:cap(payload)], r.cfg.PayloadSize)
 		} else {
-			payload = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
+			payload, berr = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
+		}
+		if berr != nil {
+			// Cannot happen after the Run() size validation; treat as a
+			// hard misconfiguration rather than a silent per-frame skip.
+			infof("worker %d: build payload: %v", id, berr)
+			r.errors.Add(1)
+			r.issued.Add(^uint64(0)) // release the Count slot
+			return
 		}
 		f.Payload = payload
 
-		// Compute TxID as SHA256d(payload) for valid frames.
-		first := sha256.Sum256(payload)
-		second := sha256.Sum256(first[:])
-		copy(f.TxID[:], second[:])
+		// Stamp the canonical TxID exactly as the system derives it
+		// (objfmt.TxID = SHA256d over the STANDARD serialization): for a
+		// BRC-12 raw payload that is SHA256d(payload); for a BRC-30 EF
+		// payload the marker and per-input extensions are excluded — the
+		// same id the proxy stamps on the bare-tx push path
+		// (objfmt.MulticastFrame) and the id consumers dedup on. Hashing
+		// the raw EF bytes instead would stamp an id no other component
+		// ever derives.
+		id, ierr := objfmt.TxID(payload)
+		if ierr != nil {
+			r.errors.Add(1)
+			r.issued.Add(^uint64(0)) // release the Count slot
+			continue
+		}
+		f.TxID = id
 
 		// Optionally corrupt TxID (flip a random bit) based on corrupt rate.
 		if r.cfg.CorruptTxIDRate > 0 {
