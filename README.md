@@ -188,14 +188,20 @@ See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](doc
 ## Container image
 
 The Dockerfile produces a single `gcr.io/distroless/static:nonroot` image
-containing all four binaries:
+containing all six binaries:
 
 ```
 /usr/local/bin/subtx-gen             (continuous BRC-124/BRC-128 frame generator)
 /usr/local/bin/send-anchor-frame     (one-shot BRC-134 anchor)
-/usr/local/bin/send-block-announce   (one-shot BRC-131 announce)
-/usr/local/bin/send-subtree-data     (one-shot BRC-132 subtree-data)
+/usr/local/bin/send-block-announce   (one-shot BRC-131 announce, multicast ingress)
+/usr/local/bin/send-subtree-data     (one-shot BRC-132 subtree-data, multicast ingress)
+/usr/local/bin/send-subtree-push     (one-shot BRC-143 subtree push → proxy lane 8726)
+/usr/local/bin/send-block-push       (one-shot BRC-144 block push → proxy lane 8727)
 ```
+
+The two push senders target the proxy's current privileged ingest lanes
+(`-subtree-listen-port` / `-block-listen-port`); the multicast senders above
+them exercise the legacy fabric-internal path.
 
 **No `ENTRYPOINT` is set** — the consumer (Helm chart `mode` selector,
 `docker run --entrypoint=…`, Kubernetes `command:` field) picks which binary
