@@ -36,7 +36,8 @@ var Version = "dev"
 
 func main() {
 	var (
-		addr                  = flag.String("addr", "[::1]:8725", "target host:port (UDP)")
+		addr                  = flag.String("addr", "[::1]:8725", "target host:port (UDP by default; TCP with -tcp)")
+		tcp                   = flag.Bool("tcp", false, "submit over TCP — the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. -mode unicast only.")
 		frameVer              = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
 		shardBits             = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
@@ -156,6 +157,7 @@ func main() {
 
 	cfg := sender.Config{
 		Addr:            *addr,
+		TCP:             *tcp,
 		FrameVersion:    fv,
 		Workers:         w,
 		PPS:             *pps,

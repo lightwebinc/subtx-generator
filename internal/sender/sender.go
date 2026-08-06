@@ -106,8 +106,12 @@ const (
 
 // Config tunes the sender.
 type Config struct {
-	Mode            Mode   // ModeUnicast (default) | ModeDirectMulticast
-	Addr            string // unicast target host:port (ModeUnicast only)
+	Mode Mode   // ModeUnicast (default) | ModeDirectMulticast
+	Addr string // unicast target host:port (ModeUnicast only)
+	// TCP submits over the proxy's TCP framed submission lane (the standard 8725
+	// lane: a stream of BRC frames, no envelope) instead of UDP. ModeUnicast only.
+	// UDP submission is deprecated; TCP is the supported submit transport.
+	TCP             bool
 	FrameVersion    myframe.Version
 	Workers         int
 	PPS             int
@@ -250,29 +254,41 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	var conn *net.UDPConn
+	var uconn net.Conn     // ModeUnicast: udp OR tcp stream to the proxy ingress
+	var mconn *net.UDPConn // ModeDirectMulticast egress socket
 	var engine *shard.Engine
 	switch r.cfg.Mode {
 	case ModeUnicast:
-		c, err := net.Dial("udp", r.cfg.Addr)
+		proto := "udp"
+		if r.cfg.TCP {
+			proto = "tcp"
+		}
+		c, err := net.Dial(proto, r.cfg.Addr)
 		if err != nil {
-			infof("worker %d: dial %s: %v", id, r.cfg.Addr, err)
+			infof("worker %d: dial %s %s: %v", id, proto, r.cfg.Addr, err)
 			return
 		}
-		conn = c.(*net.UDPConn)
+		uconn = c
 	case ModeDirectMulticast:
 		c, err := openMulticastEgress(r.cfg.EgressIface, r.cfg.BindSource)
 		if err != nil {
 			infof("worker %d: open mc egress: %v", id, err)
 			return
 		}
-		conn = c
+		mconn = c
 		engine = shard.New(r.cfg.MCPrefix, r.cfg.MCGroupID, r.cfg.ShardBits)
 	default:
 		infof("worker %d: unknown mode %d", id, r.cfg.Mode)
 		return
 	}
-	defer func() { _ = conn.Close() }()
+	defer func() {
+		if uconn != nil {
+			_ = uconn.Close()
+		}
+		if mconn != nil {
+			_ = mconn.Close()
+		}
+	}()
 
 	// Pre-compute the per-worker source-IPv6 bytes used as input to the
 	// HashKey computation in direct-multicast mode.
@@ -410,9 +426,9 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		var werr error
 		if r.cfg.Mode == ModeDirectMulticast {
 			dst := engine.Addr(groupIdx, r.cfg.EgressPort)
-			_, werr = conn.WriteToUDP(buf[:n], dst)
+			_, werr = mconn.WriteToUDP(buf[:n], dst)
 		} else {
-			_, werr = conn.Write(buf[:n])
+			_, werr = uconn.Write(buf[:n])
 		}
 		if werr != nil {
 			r.errors.Add(1)
