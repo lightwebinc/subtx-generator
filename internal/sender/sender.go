@@ -444,15 +444,18 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			_, werr = mconn.WriteToUDP(buf[:n], dst)
 		} else if tcpW != nil {
 			_, werr = tcpW.Write(buf[:n])
-			// Batch by accumulated bytes so the generator pays ~one write
-			// syscall per ~tcpFlushBytes of frames instead of one per tx, and
-			// the proxy reads more frames per recv. A size threshold (not
-			// len(tokens)==0) is what actually batches at -pps 0: there the
-			// generator keeps pace with the pacer, so the token queue sits near
-			// empty and an idle-gated flush would fire every frame. The tail
-			// (< threshold) is drained by the deferred Flush at run end, so no
-			// frame is dropped and -count stays exact.
-			if werr == nil && tcpW.Buffered() >= tcpFlushBytes {
+			// Two flush triggers with different jobs. The size threshold
+			// batches the unpaced blast (-pps 0): there the token queue sits
+			// near empty by construction, so an idle-gated flush would fire
+			// every frame and defeat batching. The paced-idle flush (PPS > 0,
+			// no token queued) bounds per-frame LATENCY at paced rates: with
+			// per-worker connections a paced worker may buffer for many
+			// seconds before reaching the size threshold — frames must leave
+			// when the pacer has nothing more queued, or a paced run delivers
+			// only end-of-run flushes. The tail (< threshold) is drained by
+			// the deferred Flush at run end, so no frame is dropped and
+			// -count stays exact.
+			if werr == nil && (tcpW.Buffered() >= tcpFlushBytes || (r.cfg.PPS > 0 && len(tokens) == 0)) {
 				werr = tcpW.Flush()
 			}
 		} else {
