@@ -258,7 +258,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	const tcpFlushBytes = 4096 // flush the TCP submit buffer once ~this many bytes of frames accumulate
 	var uconn net.Conn         // ModeUnicast: udp OR tcp stream to the proxy ingress
 	var tcpW *bufio.Writer     // buffered writer over uconn for the TCP lane (nil for UDP)
-	var mconn *net.UDPConn // ModeDirectMulticast egress socket
+	var mconn *net.UDPConn     // ModeDirectMulticast egress socket
 	var engine *shard.Engine
 	switch r.cfg.Mode {
 	case ModeUnicast:

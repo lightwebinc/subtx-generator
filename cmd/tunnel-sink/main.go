@@ -146,7 +146,7 @@ func acceptLoop(ln net.Listener, handle func(net.Conn)) {
 // ── delivery (RECV) ─────────────────────────────────────────────────────────
 
 func handleDelivery(conn net.Conn, forced objfmt.Class, maxObject int, st *stats) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	iface := ifaceFor(conn.LocalAddr())
 	st.connOpen()
 	defer st.connClose()
@@ -193,7 +193,7 @@ type submitRelay struct {
 }
 
 func (r *submitRelay) handle(client net.Conn) {
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	r.st.connOpen()
 	defer r.st.connClose()
 
@@ -216,7 +216,7 @@ func (r *submitRelay) handle(client net.Conn) {
 		slog.Warn("submit relay dial failed", "edge", addr, "err", err)
 		return
 	}
-	defer edge.Close()
+	defer func() { _ = edge.Close() }()
 	iface := ifaceFor(edge.LocalAddr())
 	laneName := "framed"
 	if !framed {
@@ -667,30 +667,32 @@ func (s *stats) printSummary(w io.Writer, listenAddr string, subLn net.Listener,
 	outMu.Lock()
 	defer outMu.Unlock()
 
-	fmt.Fprintf(w, "\n──────────────────────── tunnel-sink session summary ────────────────────────\n")
-	fmt.Fprintf(w, "started       %s\n", s.start.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "duration      %s\n", time.Since(s.start).Round(time.Second))
-	fmt.Fprintf(w, "delivery      %s   (connections: %d total, %d open at exit)\n", listenAddr, s.conns, s.active)
+	p := func(format string, args ...any) { _, _ = fmt.Fprintf(w, format, args...) }
+
+	p("\n──────────────────────── tunnel-sink session summary ────────────────────────\n")
+	p("started       %s\n", s.start.Format("2006-01-02 15:04:05"))
+	p("duration      %s\n", time.Since(s.start).Round(time.Second))
+	p("delivery      %s   (connections: %d total, %d open at exit)\n", listenAddr, s.conns, s.active)
 	if subLn != nil {
-		fmt.Fprintf(w, "submit        %s → %s (tx %d / subtree %d / block %d)\n",
+		p("submit        %s → %s (tx %d / subtree %d / block %d)\n",
 			subLn.Addr().String(), edge, txPort, subtreePort, blockPort)
 	}
-	fmt.Fprintf(w, "parse errors  %d\n\n", s.parseErrs)
+	p("parse errors  %d\n\n", s.parseErrs)
 
-	any := false
+	nonEmpty := false
 	for _, dir := range statDirs {
 		for _, b := range statBuckets {
 			if lt := s.lanes[dir+"/"+b]; lt != nil && lt.objects > 0 {
-				any = true
+				nonEmpty = true
 			}
 		}
 	}
-	if !any {
-		fmt.Fprintf(w, "no objects observed\n")
+	if !nonEmpty {
+		p("no objects observed\n")
 		return
 	}
 
-	fmt.Fprintf(w, "%-4s  %-8s  %12s  %14s  %9s  %9s  %9s  %s\n",
+	p("%-4s  %-8s  %12s  %14s  %9s  %9s  %9s  %s\n",
 		"dir", "class", "objects", "bytes", "avg", "min", "max", "totals")
 	for _, dir := range statDirs {
 		for _, b := range statBuckets {
@@ -705,7 +707,7 @@ func (s *stats) printSummary(w io.Writer, listenAddr string, subLn net.Listener,
 			case "block":
 				extra = fmt.Sprintf("%s subtrees", group(lt.subtrees))
 			}
-			fmt.Fprintf(w, "%-4s  %-8s  %12s  %14s  %9s  %9s  %9s  %s\n",
+			p("%-4s  %-8s  %12s  %14s  %9s  %9s  %9s  %s\n",
 				dir, b, group(lt.objects), group(lt.bytes),
 				byteSize(int(lt.bytes/lt.objects)), byteSize(lt.minSize), byteSize(lt.maxSize), extra)
 		}
