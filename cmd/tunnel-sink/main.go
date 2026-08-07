@@ -396,6 +396,10 @@ func logStreamEnd(kind string, conn net.Conn, err error, st *stats) {
 // (tx version word, BRC-143 NodeCount, BRC-144 count fields). The consumed
 // prefix is returned for replay into the stream reader.
 func sniffClass(conn net.Conn) (cls objfmt.Class, framed bool, pre []byte, err error) {
+	// The sniff loop arms a short read deadline to settle idle streams; it
+	// must never escape into the steady-state pump, where a delivery pause
+	// would then surface as a spurious i/o timeout that kills the connection.
+	defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
 	buf := make([]byte, 0, 8<<10)
 	tmp := make([]byte, 32<<10)
 	eof := false
@@ -420,7 +424,6 @@ func sniffClass(conn net.Conn) (cls objfmt.Class, framed bool, pre []byte, err e
 			if errors.As(rerr, &nerr) && nerr.Timeout() {
 				// Idle stream: settle for the best complete-object candidate.
 				if cls, ok := bestCandidate(buf, true); ok {
-					_ = conn.SetReadDeadline(time.Time{})
 					return cls, false, buf, nil
 				}
 				continue
