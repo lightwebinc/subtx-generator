@@ -183,6 +183,9 @@ make build
 scripts/exercise-lanes.sh -host edge.example.net              # defaults
 scripts/exercise-lanes.sh -host ::1 -tx-pps 500 -tx-size 512 \
   -subtree-interval 250ms -block-interval 10s -duration 2m
+scripts/exercise-lanes.sh -host ::1 -port 8833                # ALL lanes to one
+  # port — for a lab tunnel-sink or the submit relay; a real edge admits
+  # subtree/block only on its per-class ports (the miner-tier gate)
 ```
 
 ### Inspect the generated subtree pool

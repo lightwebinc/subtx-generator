@@ -12,6 +12,9 @@
 #   scripts/exercise-lanes.sh [flags]
 #
 #   -host <h>              edge host (default ::1)
+#   -port <p>              send ALL lanes to this one port (lab sink or the
+#                          tunnel-sink submit relay; a REAL edge admits
+#                          subtree/block only on its per-class 8726/8727)
 #   -tx-port <p>           tx ingress port          (default 8725)
 #   -subtree-port <p>      subtree push ingress     (default 8726)
 #   -block-port <p>        block push ingress       (default 8727)
@@ -43,6 +46,7 @@ usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 while [ $# -gt 0 ]; do
   case "$1" in
     -host)             HOST=$2; shift 2 ;;
+    -port)             TX_PORT=$2; SUBTREE_PORT=$2; BLOCK_PORT=$2; shift 2 ;;
     -tx-port)          TX_PORT=$2; shift 2 ;;
     -subtree-port)     SUBTREE_PORT=$2; shift 2 ;;
     -block-port)       BLOCK_PORT=$2; shift 2 ;;
