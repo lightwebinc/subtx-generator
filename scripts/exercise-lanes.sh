@@ -99,11 +99,13 @@ trap cleanup INT TERM
   -pps "$TX_PPS" -payload-size "$TX_SIZE" "${dur_args[@]}" &
 pids+=($!)
 
-"$SUBTREE_PUSH" -addr "${ADDR}:${SUBTREE_PORT}" \
+# -log-hashes makes every subtree/block emission print a line, so the lanes'
+# interleaving with the tx stream is visible live in this terminal.
+"$SUBTREE_PUSH" -addr "${ADDR}:${SUBTREE_PORT}" -log-hashes \
   -interval "$SUBTREE_INTERVAL" -nodes "$SUBTREE_NODES" "${dur_args[@]}" &
 pids+=($!)
 
-"$BLOCK_PUSH" -addr "${ADDR}:${BLOCK_PORT}" \
+"$BLOCK_PUSH" -addr "${ADDR}:${BLOCK_PORT}" -log-hashes \
   -interval "$BLOCK_INTERVAL" -subtrees "$BLOCK_SUBTREES" "${dur_args[@]}" &
 pids+=($!)
 
