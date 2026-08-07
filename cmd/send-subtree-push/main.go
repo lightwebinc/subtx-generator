@@ -26,6 +26,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -63,9 +64,13 @@ func main() {
 
 	rng := rand.NewChaCha8(sha256.Sum256([]byte(*seed)))
 
-	var deadline time.Time
+	// Enforce -duration through the context so an idle lane exits AT the
+	// deadline, not at its next tick — a long -interval must not overrun the
+	// requested runtime (all lanes of a mixed run stop together).
 	if *duration > 0 {
-		deadline = time.Now().Add(*duration)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, time.Now().Add(*duration))
+		defer cancel()
 	}
 
 	conn := dial(ctx, *addr)
@@ -112,16 +117,14 @@ func main() {
 
 		select {
 		case <-ctx.Done():
-			infof("interrupted")
+			if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				infof("interrupted")
+			}
 			infof("done: sent=%d subtree objects", sent)
 			return
 		case <-ticker.C:
-			if !deadline.IsZero() && time.Now().After(deadline) {
-				goto done
-			}
 		}
 	}
-done:
 	infof("done: sent=%d subtree objects", sent)
 }
 

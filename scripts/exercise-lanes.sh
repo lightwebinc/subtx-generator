@@ -5,7 +5,7 @@
 #   subtree send-subtree-push     -> SUBTREE_PORT (default 8726) one per interval
 #   block   send-block-push       -> BLOCK_PORT   (default 8727) one per interval
 #
-# Defaults: 256-byte transactions at 100 pps, one subtree/s, one block/min,
+# Defaults: 256-byte transactions at 10 pps, one subtree/s, one block/min,
 # run until Ctrl-C (all three senders stop together; each prints its totals).
 #
 # Usage:
@@ -18,7 +18,7 @@
 #   -tx-port <p>           tx ingress port          (default 8725)
 #   -subtree-port <p>      subtree push ingress     (default 8726)
 #   -block-port <p>        block push ingress       (default 8727)
-#   -tx-pps <n>            transaction rate         (default 100)
+#   -tx-pps <n>            transaction rate         (default 10)
 #   -tx-size <bytes>       transaction payload size (default 256)
 #   -subtree-interval <d>  subtree cadence          (default 1s)
 #   -subtree-nodes <n>     nodes per subtree        (default 16)
@@ -33,7 +33,7 @@ HOST="::1"
 TX_PORT=8725
 SUBTREE_PORT=8726
 BLOCK_PORT=8727
-TX_PPS=100
+TX_PPS=10
 TX_SIZE=256
 SUBTREE_INTERVAL=1s
 SUBTREE_NODES=16

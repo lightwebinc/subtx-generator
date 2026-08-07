@@ -174,7 +174,7 @@ tunnel-sink -listen :8833 -submit-edge edge.example.net
 
 [`scripts/exercise-lanes.sh`](scripts/exercise-lanes.sh) drives every push
 format at one edge endpoint concurrently: a continuous transaction stream
-(256-byte payloads at 100 pps by default), one BRC-143 subtree per second, and
+(256-byte payloads at 10 pps by default), one BRC-143 subtree per second, and
 one BRC-144 block per minute. Rates, intervals, sizes, ports, and duration are
 all flags; it runs until Ctrl-C unless `-duration` is set.
 
