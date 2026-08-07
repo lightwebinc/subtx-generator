@@ -255,8 +255,9 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	var uconn net.Conn     // ModeUnicast: udp OR tcp stream to the proxy ingress
-	var tcpW *bufio.Writer // buffered writer over uconn for the TCP lane (nil for UDP)
+	const tcpFlushBytes = 4096 // flush the TCP submit buffer once ~this many bytes of frames accumulate
+	var uconn net.Conn         // ModeUnicast: udp OR tcp stream to the proxy ingress
+	var tcpW *bufio.Writer     // buffered writer over uconn for the TCP lane (nil for UDP)
 	var mconn *net.UDPConn // ModeDirectMulticast egress socket
 	var engine *shard.Engine
 	switch r.cfg.Mode {
@@ -443,11 +444,15 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			_, werr = mconn.WriteToUDP(buf[:n], dst)
 		} else if tcpW != nil {
 			_, werr = tcpW.Write(buf[:n])
-			// Flush when the pacer has nothing else queued: the burst is drained,
-			// so send it now rather than hold frames for a buffer that may take a
-			// while to fill at this rate. Under load len(tokens)>0 keeps packing;
-			// bufio also auto-flushes when the 128 KiB buffer fills.
-			if werr == nil && len(tokens) == 0 {
+			// Batch by accumulated bytes so the generator pays ~one write
+			// syscall per ~tcpFlushBytes of frames instead of one per tx, and
+			// the proxy reads more frames per recv. A size threshold (not
+			// len(tokens)==0) is what actually batches at -pps 0: there the
+			// generator keeps pace with the pacer, so the token queue sits near
+			// empty and an idle-gated flush would fire every frame. The tail
+			// (< threshold) is drained by the deferred Flush at run end, so no
+			// frame is dropped and -count stays exact.
+			if werr == nil && tcpW.Buffered() >= tcpFlushBytes {
 				werr = tcpW.Flush()
 			}
 		} else {
