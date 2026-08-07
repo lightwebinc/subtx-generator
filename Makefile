@@ -1,4 +1,5 @@
 BIN      := subtx-gen
+CMDS     := $(notdir $(wildcard cmd/*))
 BINARY   := subtx-generator
 PKG      := ./...
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -15,8 +16,11 @@ DAGGER_RUN := GOWORK=off go run .
 
 all: build
 
-build:                 ## build subtx-gen on the host
-	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/subtx-gen
+build:                 ## build all cmd/* binaries on the host
+	@set -e; for c in $(CMDS); do \
+	  echo "building $$c"; \
+	  CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $$c ./cmd/$$c; \
+	done
 
 test:
 	go test -race -count=1 $(PKG)
@@ -28,7 +32,7 @@ tidy:
 	go mod tidy
 
 clean:
-	rm -f $(BIN)
+	rm -f $(CMDS)
 	rm -rf build
 
 # Push the binary into the `source` LXD VM for end-to-end lab tests.

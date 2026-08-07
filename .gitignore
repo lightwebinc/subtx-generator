@@ -1,8 +1,14 @@
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
-# Binaries for programs and plugins
+# Binaries for programs and plugins (make build outputs, one per cmd/*)
 /subtx-gen
+/send-anchor-frame
+/send-block-announce
+/send-subtree-data
+/send-subtree-push
+/send-block-push
+/tunnel-sink
 *.exe
 *.exe~
 *.dll
