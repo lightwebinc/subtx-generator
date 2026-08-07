@@ -10,6 +10,7 @@
 package sender
 
 import (
+	"bufio"
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/binary"
@@ -255,6 +256,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	defer wg.Done()
 
 	var uconn net.Conn     // ModeUnicast: udp OR tcp stream to the proxy ingress
+	var tcpW *bufio.Writer // buffered writer over uconn for the TCP lane (nil for UDP)
 	var mconn *net.UDPConn // ModeDirectMulticast egress socket
 	var engine *shard.Engine
 	switch r.cfg.Mode {
@@ -269,6 +271,15 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			return
 		}
 		uconn = c
+		// Buffer the TCP submission stream: coalesce many small tx writes into
+		// larger segments so the generator pays one syscall per BURST instead
+		// of one per tx, and the proxy reads more frames per recv (denser
+		// coalescing). Flushed when the token burst drains (see below), so a
+		// tx is never held once the pacer has nothing more queued — latency is
+		// bounded by the burst, not the buffer. UDP stays unbuffered (datagrams).
+		if r.cfg.TCP {
+			tcpW = bufio.NewWriterSize(uconn, 128*1024)
+		}
 	case ModeDirectMulticast:
 		c, err := openMulticastEgress(r.cfg.EgressIface, r.cfg.BindSource)
 		if err != nil {
@@ -282,6 +293,9 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		return
 	}
 	defer func() {
+		if tcpW != nil {
+			_ = tcpW.Flush() // drain any buffered tail before close (ctx cancel, count reached, error)
+		}
 		if uconn != nil {
 			_ = uconn.Close()
 		}
@@ -427,6 +441,15 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		if r.cfg.Mode == ModeDirectMulticast {
 			dst := engine.Addr(groupIdx, r.cfg.EgressPort)
 			_, werr = mconn.WriteToUDP(buf[:n], dst)
+		} else if tcpW != nil {
+			_, werr = tcpW.Write(buf[:n])
+			// Flush when the pacer has nothing else queued: the burst is drained,
+			// so send it now rather than hold frames for a buffer that may take a
+			// while to fill at this rate. Under load len(tokens)>0 keeps packing;
+			// bufio also auto-flushes when the 128 KiB buffer fills.
+			if werr == nil && len(tokens) == 0 {
+				werr = tcpW.Flush()
+			}
 		} else {
 			_, werr = uconn.Write(buf[:n])
 		}
