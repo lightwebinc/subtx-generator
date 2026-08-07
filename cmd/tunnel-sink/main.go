@@ -60,6 +60,13 @@ const (
 
 	sniffDecideAt = 64 << 10 // undecided past this: pick best-scoring class
 	sniffCap      = 1 << 20  // absolute sniff bound; unclassifiable beyond it
+
+	// sniffSettle is how long an idle ambiguous stream is allowed to stay
+	// unclassified before the best complete-object candidate is picked. It
+	// is the worst-case FIRST-OBJECT reporting delay for a sparse lane whose
+	// leading object is shorter than the block-candidate check window, so it
+	// must stay small — this is a diagnostic tool.
+	sniffSettle = 250 * time.Millisecond
 )
 
 func main() {
@@ -416,7 +423,7 @@ func sniffClass(conn net.Conn) (cls objfmt.Class, framed bool, pre []byte, err e
 		if len(buf) >= sniffCap {
 			return 0, false, buf, fmt.Errorf("no lane class inferred within %d bytes", sniffCap)
 		}
-		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(sniffSettle))
 		n, rerr := conn.Read(tmp)
 		buf = append(buf, tmp[:n]...)
 		if rerr != nil {
