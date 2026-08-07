@@ -195,3 +195,29 @@ flow accounting (label `brc134`).
 integration scenarios 36 (delivery) and 37 (retransmit) in
 [multicast-test SCENARIOS.md](https://github.com/lightwebinc/multicast-test/blob/main/SCENARIOS.md). See
 [bsv-multicast/docs/brc-134-anchor-transactions.md](https://github.com/lightwebinc/bsv-multicast/blob/main/docs/brc-134-anchor-transactions.md).
+
+## tunnel-sink
+
+`tunnel-sink` is the only receiving-side binary in the repo: a consumer-side
+diagnostic sink for the commercial tunnel delivery plane (RR SDA push). The
+edge listener dials out to the consumer's published SDA and pushes bare,
+single-class, self-delimiting objects (`shard-common/objfmt`) — one TCP
+connection per elected lane. `tunnel-sink` plays the consumer role: it
+listens (default `:8833`), classifies each accepted connection by walking
+the buffered prefix with each candidate codec (tx version word, BRC-143
+NodeCount, BRC-144 count-field plausibility; network magic ⇒ framed
+BRC-124 stream), then splits the stream with `objfmt.Reader` and logs one
+diagnostic line per object.
+
+With `-submit-edge` it also covers the sent direction: a local submit
+listener classifies the submitted stream the same way, relays it verbatim
+to the edge ingress lane that matches the class (tx 8725 / subtree 8726 /
+block 8727 — framed streams ride the tx port, whose grammar the proxy
+magic-detects), and logs each relayed object as `SENT`. Delivery and
+ingress lanes are one-way; the relay drains the edge side only to observe
+close.
+
+Per-connection interface attribution maps the connection's local address to
+the owning network device (the WireGuard tunnel device for an overlay SDA).
+Session statistics (objects, bytes, min/avg/max sizes, total subtree nodes,
+total block subtrees, per direction and class) print on SIGINT/SIGTERM.

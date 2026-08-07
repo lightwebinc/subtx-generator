@@ -192,3 +192,38 @@ Streams BRC-144 block push objects to the proxy's tunnel-bound block push lane
 | `-height-start` | `800000` | Block height of the first block |
 | `-seed` | `block-push` | PRNG seed (identifies this source for the delivery matrix) |
 | `-log-hashes` | `false` | Print every block hash (for end-to-end hash compare) |
+
+---
+
+## tunnel-sink
+
+Consumer-side diagnostic sink for the tunnel delivery plane. Listens on the
+consumer's SDA, accepts the edge's push connections, and logs one line per
+object (timestamp, direction, interface, BRC number, class, object id, class
+detail). Lane class is auto-detected per connection (bare lanes carry no type
+tag); a framed BRC-124 stream is recognized by network magic. Prints
+per-class session statistics on SIGINT/SIGTERM.
+
+| Flag | Default | Description |
+|---|---|---|
+| `-listen` | `:8833` | Delivery listen address — the consumer SDA (empty host = all interfaces; 8833 is the standard Teranode propagation port) |
+| `-lane` | `auto` | Force the delivery lane class: `auto\|tx\|subtree\|block` (auto = per-connection sniff) |
+| `-summary` | `true` | Print session summary statistics on exit |
+| `-max-object` | `268435456` | Maximum single object size in bytes (256 MiB) |
+| `-submit-edge` | *(empty)* | Edge host: enables the submit relay (SENT direction) toward this edge |
+| `-submit-listen` | `localhost:8724` | Submit relay listen address (used with `-submit-edge`) |
+| `-submit-tx-port` | `8725` | Edge tx ingress port |
+| `-submit-subtree-port` | `8726` | Edge subtree push ingress port |
+| `-submit-block-port` | `8727` | Edge block push ingress port |
+
+Notes:
+
+- The delivery lanes are one-way (edge → consumer); the sink never writes on
+  a delivery connection.
+- The submit relay auto-detects the class of the submitted stream and dials
+  the edge port that matches (`tx`/framed → `-submit-tx-port`, BRC-143 →
+  `-submit-subtree-port`, BRC-144 → `-submit-block-port`), forwarding bytes
+  verbatim. Subtree/block submissions are miner-tier gated at the edge; the
+  relay forwards regardless and the edge applies policy.
+- Object ids are logged in internal byte order (matching the emitters'
+  `-log-hashes` output), truncated to the leading 8 bytes.

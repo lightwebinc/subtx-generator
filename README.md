@@ -30,6 +30,10 @@ as zero; the proxy stamps them in-place before multicast forwarding.
 - **Deterministic Subtree pick** — `SubtreeID = pool[uint64(TxID[:8]) % N]`
   so listeners filtering on a single subtree see a predictable traffic
   fraction (≈ `1/N`).
+- **Consumer tunnel sink** — `tunnel-sink` receives and logs the tunnel
+  delivery lanes (tx / BRC-143 subtree / BRC-144 block) with per-object
+  diagnostic lines and exit-time summary statistics; optional submit relay
+  logs the sent direction too.
 - **Unified structured logging** — uses `shard-common/logging` (no more plain
   `log`); set `LOG_FORMAT=json` for JSON-on-stdout matching the rest of the
   fleet. See the [Unified Logging Plan](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
@@ -43,7 +47,7 @@ go install github.com/lightwebinc/subtx-generator/cmd/subtx-gen@latest
 Or local build:
 
 ```bash
-make build           # produces ./subtx-gen
+make build           # builds every cmd/* binary into the repo root
 make install-source  # lxc file push to the `source` LXD VM
 ```
 
@@ -147,6 +151,25 @@ subtx-gen \
 | `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
 | `-announce-phase-interval` | `0` | How often to advance the phase; 0 = phased mode disabled |
 
+### Consumer tunnel sink (receive side)
+
+`tunnel-sink` is the receiving-side counterpart to the senders above: a
+consumer-side diagnostic sink for the tunnel delivery plane. It listens on the
+consumer's SDA (default `:8833`), auto-detects each connection's lane class
+(raw/EF tx, BRC-143 subtree, BRC-144 block — or a framed BRC-124 stream by
+network magic), and logs one line per object with timestamp, direction,
+interface, BRC number, class, object id, and the class detail (tx size /
+subtree node count / block subtree count). On exit (Ctrl-C) it prints
+per-class session statistics.
+
+```bash
+tunnel-sink -listen '[fd00:1b5e::1]:8833'
+
+# also log the SENT direction: relay local submissions to the edge's
+# ingress lanes (tx 8725 / subtree 8726 / block 8727) and log each object
+tunnel-sink -listen :8833 -submit-edge edge.example.net
+```
+
 ### Inspect the generated subtree pool
 
 ```bash
@@ -162,6 +185,7 @@ cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP, legacy)
 cmd/send-anchor-frame/    — BRC-134 anchor transaction sender (UDP default, -tcp opt)
 cmd/send-subtree-push/    — BRC-143 subtree push sender (TCP, lane 8726)
 cmd/send-block-push/      — BRC-144 block push sender (TCP, lane 8727)
+cmd/tunnel-sink/          — consumer tunnel delivery sink + submit relay (diagnostic logger)
 internal/tx/              — exact-size walkable tx payload builder (raw + BRC-30 EF; never pads)
 internal/subtree/         — deterministic subtree-ID pool
 internal/seq/             — shared seq allocator + gap injector
@@ -188,7 +212,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](doc
 ## Container image
 
 The Dockerfile produces a single `gcr.io/distroless/static:nonroot` image
-containing all six binaries:
+containing all seven binaries:
 
 ```
 /usr/local/bin/subtx-gen             (continuous BRC-124/BRC-128 frame generator)
@@ -197,6 +221,7 @@ containing all six binaries:
 /usr/local/bin/send-subtree-data     (one-shot BRC-132 subtree-data, multicast ingress)
 /usr/local/bin/send-subtree-push     (one-shot BRC-143 subtree push → proxy lane 8726)
 /usr/local/bin/send-block-push       (one-shot BRC-144 block push → proxy lane 8727)
+/usr/local/bin/tunnel-sink           (consumer tunnel delivery sink + submit relay, diagnostic)
 ```
 
 The two push senders target the proxy's current privileged ingest lanes
