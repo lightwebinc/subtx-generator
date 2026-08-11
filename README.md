@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/lightwebinc/subtx-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/lightwebinc/subtx-generator/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/lightwebinc/subtx-generator.svg)](https://pkg.go.dev/github.com/lightwebinc/subtx-generator)
-[![Go Report Card](https://goreportcard.com/badge/github.com/lightwebinc/subtx-generator)](https://goreportcard.com/report/github.com/lightwebinc/subtx-generator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 > Part of the [**BSV Layered Multicast**](https://github.com/lightwebinc/bsv-multicast) open-source project — see the main repository for the full architecture, design docs, and BRC specifications.
