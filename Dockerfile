@@ -17,7 +17,7 @@
 # No ENTRYPOINT is set: the consuming workload (Helm chart, docker run --entrypoint)
 # selects which binary to invoke.
 
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 
