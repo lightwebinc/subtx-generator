@@ -2,7 +2,7 @@
 
 All parameters are accepted as CLI flags only, with one exception: every binary
 (`subtx-gen`, `send-block-announce`, `send-subtree-data`, `send-anchor-frame`,
-`send-subtree-push`, `send-block-push`)
+`send-subtree-push`, `send-block-push`, `tunnel-sink`)
 reads the `LOG_FORMAT` environment variable (`text` default | `json`) for
 unified structured logging via `shard-common/logging` — see the
 [canonical logging doc](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
@@ -16,7 +16,8 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:8725` | Target `host:port` for UDP frame sending |
+| `-addr` | `[::1]:8725` | Target `host:port` (UDP by default; TCP with `-tcp`) |
+| `-tcp` | `false` | Submit over TCP — the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. `-mode unicast` only |
 | `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header) |
 | `-shard-bits` | `2` | Informational: shard-bits the proxy uses (for predicted-group diagnostic logging) |
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |

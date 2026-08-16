@@ -69,6 +69,7 @@ subtx-generator/
   cmd/send-anchor-frame/   Standalone BRC-134 sender (anchor transaction chain root)
   cmd/send-subtree-push/   Standalone BRC-143 subtree push sender (TCP lane 8726)
   cmd/send-block-push/     Standalone BRC-144 block push sender (TCP lane 8727)
+  cmd/tunnel-sink/         Consumer tunnel delivery sink + submit relay
   internal/tx/             Random BSV-shaped transaction payload builder
   internal/subtree/        Deterministic subtree-ID pool (seed → N stable 32-byte IDs)
   internal/seq/            Shared atomic sequence allocator with gap injection
@@ -77,6 +78,7 @@ subtx-generator/
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
   internal/announce/       BRC-127 SubtreeGroupAnnounce TCP sender
   internal/blockhdr/       Synthetic PoW-valid 80-byte block-header builder
+  scripts/exercise-lanes.sh  Drive tx + subtree + block lanes at one edge concurrently
 ```
 
 ## Frame Generation (subtx-gen)

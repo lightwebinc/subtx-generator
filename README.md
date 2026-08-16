@@ -229,8 +229,8 @@ See [docs/architecture.md](docs/architecture.md) and [docs/configuration.md](doc
 
 ## Container image
 
-The Dockerfile produces a single `gcr.io/distroless/static:nonroot` image
-containing all seven binaries:
+Built from current source, the Dockerfile produces a single
+`gcr.io/distroless/static:nonroot` image containing all seven binaries:
 
 ```
 /usr/local/bin/subtx-gen             (continuous BRC-124/BRC-128 frame generator)
@@ -241,6 +241,11 @@ containing all seven binaries:
 /usr/local/bin/send-block-push       (one-shot BRC-144 block push → proxy lane 8727)
 /usr/local/bin/tunnel-sink           (consumer tunnel delivery sink + submit relay, diagnostic)
 ```
+
+> **Published images lag the source.** The newest published image
+> (`ghcr.io/lightwebinc/subtx-generator:0.2.6`) contains only the first four
+> binaries — `send-subtree-push`, `send-block-push`, and `tunnel-sink` are
+> absent from every published image. Build from the Dockerfile for the full set.
 
 The two push senders target the proxy's current privileged ingest lanes
 (`-subtree-listen-port` / `-block-listen-port`); the multicast senders above
@@ -262,9 +267,9 @@ A Kubernetes Helm chart is published from a dedicated chart repository:
   helm repo add bsg https://lightwebinc.github.io/subtx-generator-helm
   helm install gen bsg/subtx-generator --set mode=subtx-gen
   ```
-- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator --version 0.3.0`
+- OCI: `helm install gen oci://ghcr.io/lightwebinc/charts/subtx-generator`
 
-The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (`subtx-gen` | `send-anchor-frame` | `send-block-announce` | `send-subtree-data`). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
+The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` — see the chart README for the mode list. Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
 
 ## License
 
