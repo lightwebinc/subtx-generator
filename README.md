@@ -242,10 +242,11 @@ Built from current source, the Dockerfile produces a single
 /usr/local/bin/tunnel-sink           (consumer tunnel delivery sink + submit relay, diagnostic)
 ```
 
-> **Published images lag the source.** The newest published image
-> (`ghcr.io/lightwebinc/subtx-generator:0.2.6`) contains only the first four
-> binaries — `send-subtree-push`, `send-block-push`, and `tunnel-sink` are
-> absent from every published image. Build from the Dockerfile for the full set.
+> Images are published per release tag as
+> `ghcr.io/lightwebinc/subtx-generator:<tag>` (the git tag without its `v`).
+> Every `0.3.x` image carries all seven binaries; the older `0.2.x` images
+> carry only the first four (`send-subtree-push`, `send-block-push`, and
+> `tunnel-sink` are absent there).
 
 The two push senders target the proxy's current privileged ingest lanes
 (`-subtree-listen-port` / `-block-listen-port`); the multicast senders above
