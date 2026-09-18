@@ -163,7 +163,11 @@ removed; see the gate note in the Overview. The current path is `send-block-push
    hash as ContentID (`SHA256d(blockHeader)`), and `subtrees` random subtree hashes appended
    to the payload.
 2. **CoinbaseTx** (MsgType `0x02`, unless `-coinbase=false`): carries a random coinbase
-   transaction with the CoinbaseTxID as ContentID.
+   transaction with the CoinbaseTxID as ContentID. This frame type is deprecated
+   (BRC-133): production producers carry the coinbase inline in the BRC-144 block,
+   and the listener's default-on block-control gate drops a standalone coinbase
+   frame (`coinbase_legacy`). It is retained in the protocol for a possible future
+   split carriage, so the sender still builds it for testing that path.
 
 `HashKey` and `SeqNum` are left zero; the proxy stamps them. Intended to test the listener's
 `processBlockFrame` path, block header egress, and BRC-131 fragment reassembly.

@@ -111,13 +111,21 @@ Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 | `-blocks` | `10` | Number of simulated blocks to announce |
 | `-subtrees` | `4` | Subtree hashes per BlockAnnounce frame |
 | `-interval` | `100ms` | Delay between successive block pairs |
-| `-coinbase` | `true` | Also send a CoinbaseTx frame (MsgType 0x02) for each block |
+| `-coinbase` | `true` | Also send a CoinbaseTx frame (MsgType 0x02) for each block. Deprecated frame type (BRC-133): the listener's default-on block-control gate drops it as `coinbase_legacy`; set `-coinbase=false` unless testing that path |
 
 Each BlockAnnounce carries a random 80-byte block header with ContentID set to
 `SHA256d(blockHeader)`. When `-coinbase=true`, a CoinbaseTx frame follows immediately
 with a structurally valid (walkable) coinbase transaction and its canonical TxID
 (`objfmt.TxID`) as ContentID — never random bytes, which would desync a
 downstream tx-class objfmt stream.
+
+The standalone CoinbaseTx frame is deprecated: production producers never
+emit it, because the coinbase travels inline in the BRC-144 block body
+(`send-block-push`), and a listener with the default block-control gate
+drops it, counted as `bsl_frames_dropped_total{reason="coinbase_legacy"}`.
+The message type is retained in the protocol (reserved for a possible
+future design that carries blocks and their coinbase separately on the
+fabric), which is why this sender can still build it.
 
 ---
 
