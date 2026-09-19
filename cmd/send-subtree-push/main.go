@@ -39,6 +39,7 @@ import (
 
 	"github.com/lightwebinc/shard-common/logging"
 	"github.com/lightwebinc/shard-common/objfmt"
+	"github.com/lightwebinc/subtx-generator/internal/merkle"
 )
 
 func main() {
@@ -129,10 +130,9 @@ func main() {
 }
 
 // buildSubtree constructs one BRC-143 subtree push object and returns it with
-// its merkle root. The root is SHA256d over the node hashes — a deterministic,
-// content-binding stand-in identity carried in-band (objfmt is byte-only and
-// does not recompute a consensus merkle root); the receiver compares the
-// delivered root against this one for the hash proof.
+// its merkle root, computed as Teranode computes it, so a proxy running
+// -verify-subtree-root forwards it. The receiver compares the delivered root
+// against this one for the hash proof.
 func buildSubtree(rng *rand.ChaCha8, nodes int, coinbasePlaceholder bool) ([]byte, [32]byte) {
 	obj := make([]byte, objfmt.SubtreeHeaderSize+nodes*32)
 	for i := 0; i < nodes; i++ {
@@ -145,8 +145,7 @@ func buildSubtree(rng *rand.ChaCha8, nodes int, coinbasePlaceholder bool) ([]byt
 		}
 		fillRand(rng, obj[off:off+32])
 	}
-	h1 := sha256.Sum256(obj[objfmt.SubtreeHeaderSize:])
-	root := sha256.Sum256(h1[:])
+	root := merkle.Root(obj[objfmt.SubtreeHeaderSize:], 32, nodes)
 	copy(obj[0:32], root[:])
 	binary.BigEndian.PutUint64(obj[32:40], uint64(nodes))
 	return obj, root

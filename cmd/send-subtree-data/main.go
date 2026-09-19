@@ -2,8 +2,11 @@
 // shard-proxy via TCP for integration testing.
 //
 // It sends SubtreeData frames with configurable MsgType (hashes-only or
-// full-nodes), payload size, and count. SeqNum and HashKey are left zero so
-// the proxy stamps them in-place.
+// full-nodes), node count, and frame count. Each payload is a well-formed
+// BRC-132 payload of random node hashes, and each SubtreeID is the merkle root
+// of those nodes as Teranode computes it, so a proxy running
+// -verify-subtree-root forwards it. SeqNum and HashKey are left zero so the
+// proxy stamps them in-place.
 //
 // Usage:
 //
@@ -18,6 +21,7 @@ import (
 	"log/slog"
 
 	"github.com/lightwebinc/shard-common/logging"
+	"github.com/lightwebinc/subtx-generator/internal/merkle"
 	"net"
 	"os"
 	"time"
@@ -33,9 +37,10 @@ const (
 	subtreeMsgHashesOnly = 0x01
 	subtreeMsgFullNodes  = 0x02
 
-	// Subtree data payload header: MsgType(1) + Reserved(3) + SubtreeID(32) +
-	// NodeCount(4) + SubtreeHeight(4) = 44 bytes prepended before node data.
-	// For testing we just write random node bytes after a minimal 8-byte header.
+	// BRC-132 payload: TotalFees(8) + TotalSizeBytes(8) + NodeCount(8), the
+	// nodes, then ConflictCount(8) (always zero here).
+	payloadHeaderSize   = 24
+	conflictCountSize   = 8
 	subtreeNodeHashSize = 32 // bytes per node in hashes-only mode
 	subtreeNodeFullSize = 48 // bytes per node in full-nodes mode (hash+fee+size)
 )
@@ -46,9 +51,9 @@ func main() {
 	msgTypeStr := flag.String("msg-type", "hashes", "payload type: hashes | full")
 	nodeCount := flag.Int("nodes", 16, "number of subtree nodes per frame")
 	payloadSize := flag.Int("payload-size", 0,
-		"override total payload size in bytes (0 = derived from nodes × node-size)")
+		"approximate payload size in bytes; overrides -nodes with as many nodes as fit (0 = use -nodes)")
 	subtreeCount := flag.Int("subtree-count", 0,
-		"number of unique subtree IDs to cycle through (0 = one fresh random ID per frame)")
+		"number of unique subtrees to cycle through (0 = one fresh random subtree per frame)")
 	interval := flag.Duration("interval", 50*time.Millisecond, "delay between frames")
 	flag.Parse()
 	logging.Init(logging.Options{Service: "subtx-generator", Level: slog.LevelInfo, Format: logging.ParseFormat(os.Getenv("LOG_FORMAT"))})
@@ -66,20 +71,21 @@ func main() {
 		fatalf("unknown msg-type %q: want hashes or full", *msgTypeStr)
 	}
 
-	payLen := *payloadSize
-	if payLen <= 0 {
-		payLen = *nodeCount * nodeSize
+	nodes := *nodeCount
+	if *payloadSize > 0 {
+		nodes = (*payloadSize - payloadHeaderSize - conflictCountSize) / nodeSize
 	}
-	if payLen < 1 {
-		payLen = nodeSize
+	if nodes < 1 {
+		nodes = 1
 	}
+	payLen := payloadHeaderSize + nodes*nodeSize + conflictCountSize
 
-	// Pre-generate the subtree ID pool when -subtree-count > 0.
-	var subtreePool [][32]byte
+	// Pre-generate the subtree pool when -subtree-count > 0.
+	var subtreePool []subtree
 	if *subtreeCount > 0 {
-		subtreePool = make([][32]byte, *subtreeCount)
+		subtreePool = make([]subtree, *subtreeCount)
 		for i := range subtreePool {
-			mustRand(subtreePool[i][:])
+			subtreePool[i] = newSubtree(msgType, nodeSize, nodes)
 		}
 	}
 
@@ -93,18 +99,15 @@ func main() {
 
 	sent := 0
 	for i := 0; i < *frameCount; i++ {
-		// SubtreeID: cycle through the pool when -subtree-count is set,
-		// otherwise generate a fresh random ID per frame.
-		var subtreeID [32]byte
+		// Cycle through the pool when -subtree-count is set, otherwise
+		// generate a fresh random subtree per frame.
+		var st subtree
 		if len(subtreePool) > 0 {
-			subtreeID = subtreePool[i%len(subtreePool)]
+			st = subtreePool[i%len(subtreePool)]
 		} else {
-			mustRand(subtreeID[:])
+			st = newSubtree(msgType, nodeSize, nodes)
 		}
-
-		// Random payload (node hashes or full-node records).
-		payload := make([]byte, payLen)
-		mustRand(payload)
+		subtreeID, payload := st.root, st.payload
 
 		frame := encodeSubtreeDataFrame(msgType, subtreeID, payload)
 		if err := writeFrame(conn, frame); err != nil {
@@ -125,6 +128,34 @@ func main() {
 
 // encodeSubtreeDataFrame builds a BRC-132 wire frame.
 // HashKey (40:48) and SeqNum (48:56) are left zero — the proxy stamps them.
+// subtree is one generated subtree: its BRC-132 payload and merkle root.
+type subtree struct {
+	root    [32]byte
+	payload []byte
+}
+
+// newSubtree builds a BRC-132 payload of n random nodes at nodeSize bytes each
+// (full-node records get a fee of 1 and a size of 250 per node, with matching
+// totals) and computes the merkle root the frame's SubtreeID must carry.
+func newSubtree(msgType byte, nodeSize, n int) subtree {
+	p := make([]byte, payloadHeaderSize+n*nodeSize+conflictCountSize)
+	nodes := p[payloadHeaderSize : payloadHeaderSize+n*nodeSize]
+	for i := 0; i < n; i++ {
+		off := i * nodeSize
+		mustRand(nodes[off : off+32])
+		if msgType == subtreeMsgFullNodes {
+			binary.BigEndian.PutUint64(nodes[off+32:off+40], 1)
+			binary.BigEndian.PutUint64(nodes[off+40:off+48], 250)
+		}
+	}
+	if msgType == subtreeMsgFullNodes {
+		binary.BigEndian.PutUint64(p[0:8], uint64(n))
+		binary.BigEndian.PutUint64(p[8:16], uint64(n)*250)
+	}
+	binary.BigEndian.PutUint64(p[16:24], uint64(n))
+	return subtree{root: merkle.Root(nodes, nodeSize, n), payload: p}
+}
+
 // SubtreeID occupies bytes 56:88 (the SubtreeID field in the V5 header).
 func encodeSubtreeDataFrame(msgType byte, subtreeID [32]byte, payload []byte) []byte {
 	buf := make([]byte, headerSize+len(payload))
