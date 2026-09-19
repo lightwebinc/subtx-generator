@@ -142,8 +142,8 @@ is `send-subtree-push` → 8726.
 | `-frames` | `20` | Number of BRC-132 frames to send |
 | `-msg-type` | `hashes` | Payload type: `hashes` (hashes-only, 32 bytes/node) or `full` (full-nodes, 48 bytes/node) |
 | `-nodes` | `16` | Number of subtree nodes per frame |
-| `-payload-size` | `0` | Override total payload size in bytes (0 = derived from `-nodes` × node size) |
-| `-subtree-count` | `0` | Unique subtree IDs to cycle through (0 = fresh random ID per frame) |
+| `-payload-size` | `0` | Approximate payload size in bytes; overrides `-nodes` with as many nodes as fit (0 = use `-nodes`) |
+| `-subtree-count` | `0` | Unique subtrees to cycle through (0 = fresh random subtree per frame) |
 | `-interval` | `50ms` | Delay between frames |
 
 ---
@@ -170,6 +170,11 @@ Streams BRC-143 subtree push objects (header-stripped, self-delimiting) to the
 proxy's tunnel-bound subtree push lane (standard 8726) over TCP — the current
 path for miner subtree ingest. The proxy reframes each object into a BRC-132
 multicast frame.
+
+Both subtree senders compute each subtree's merkle root as Teranode does, so a
+proxy running `-verify-subtree-root` (on by default) forwards them.
+`send-subtree-data` sends well-formed BRC-132 payloads of random node hashes
+with the root as the `SubtreeID`.
 
 | Flag | Default | Description |
 |---|---|---|
