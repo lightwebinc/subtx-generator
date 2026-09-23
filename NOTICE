@@ -10,16 +10,6 @@ BRC-132 subtree data frames, and BRC-134 anchor transactions over UDP
 or TCP for load and functional testing.
 
 =========================================================================
-Conceptual Attribution
-
-The IPv6 multicast transaction broadcast architecture from which this
-software draws inspiration was articulated by Dr. Craig S. Wright:
-
-  Multicast within Multicast: Anycast
-  https://singulargrit.substack.com/p/multicast-within-multicast-anycast
-  https://singulargrit.substack.com/
-
-=========================================================================
 Third-Party Standards
 
 This software emits wire-frame formats conforming to BRC-12 and
