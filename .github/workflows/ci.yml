@@ -13,27 +13,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   ci:
-    name: ci (dagger)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: subtx-generator
+    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@3f438e60ade351107a3d1601955ebbf34de8caf1 # v0.1.0
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: lightwebinc/shard-common
-          path: shard-common
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: subtx-generator/ci/go.mod
-          cache: false
-
-      - name: Run Dagger pipeline
-        working-directory: subtx-generator
-        env:
-          GOWORK: "off"
-        run: make ci
