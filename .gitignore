@@ -37,3 +37,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# go build output of the ci/ module (run it with `go run .`)
+ci/ci
