@@ -255,14 +255,14 @@ them exercise the legacy fabric-internal path.
 **No `ENTRYPOINT` is set** — the consumer (Helm chart `mode` selector,
 `docker run --entrypoint=…`, Kubernetes `command:` field) picks which binary
 to invoke. Running the image without an explicit entrypoint will fail. The
-[`subtx-generator-helm`](https://github.com/lightwebinc/subtx-generator-helm)
+[`charts/subtx-generator`](https://github.com/lightwebinc/charts/tree/main/charts/subtx-generator)
 chart automates this via `.Values.mode`.
 
 ## Helm chart
 
 A Kubernetes Helm chart is published from a dedicated chart repository:
 
-- Repository: [`lightwebinc/subtx-generator-helm`](https://github.com/lightwebinc/subtx-generator-helm)
+- Repository: [`charts/subtx-generator`](https://github.com/lightwebinc/charts/tree/main/charts/subtx-generator)
 - HTTPS:
   ```
   helm repo add bsg https://lightwebinc.github.io/subtx-generator-helm
