@@ -47,7 +47,6 @@ Or local build:
 
 ```bash
 make build           # builds every cmd/* binary into the repo root
-make install-source  # lxc file push to the `source` LXD VM
 ```
 
 ## Usage
