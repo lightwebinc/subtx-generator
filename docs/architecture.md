@@ -7,17 +7,11 @@ It generates random BRC-124/BRC-128 UDP frames at configurable rates, with contr
 subtree ID assignment and optional sequence gap injection to exercise the NACK/retransmission
 path of `shard-listener` and `retry-endpoint`.
 
-It also provides five standalone tools — `send-block-announce`, `send-subtree-data`,
-`send-anchor-frame`, `send-subtree-push`, and `send-block-push` — for injecting BRC-131,
-BRC-132, BRC-134, BRC-143, and BRC-144 frames into `shard-proxy`.
-`send-block-announce` and `send-subtree-data` send **privileged** BRC-131/132 multicast
-frames over TCP: the proxy's miner TCP ingress (`-miner-tcp-listen-port`) and
-`-tx-accept-privileged` were removed (2026-07-07), so these legacy senders work only
-against legacy/dev setups that drive a privileged ingress class — the transaction
-ingress silently drops BRC-131/132 (see the
-[shard-proxy transaction-only ingress](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated)).
-The current path is the BRC-143/144 push lanes: `send-subtree-push` (→ 8726) and
-`send-block-push` (→ 8727).
+It also provides six standalone tools: `send-block-announce`, `send-subtree-data`,
+`send-anchor-frame`, `send-subtree-push`, `send-block-push` (BRC-131, BRC-132, BRC-134,
+BRC-143, and BRC-144 senders for `shard-proxy`), and the `tunnel-sink` receiver.
+`send-block-announce` and `send-subtree-data` are legacy privileged senders; use
+`send-subtree-push` (8726) and `send-block-push` (8727). See [Miner port deprecation](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
 `send-anchor-frame` sends UDP by default (matching the BRC-124/128 data path) with an
 optional `-tcp` flag; anchor frames (BRC-134) and BRC-127 SubtreeGroupAnnounce
 remain ungated.
@@ -155,9 +149,7 @@ scaling scenarios.
 ## send-block-announce
 
 `send-block-announce` connects to a proxy TCP ingress that accepts privileged frames
-(legacy/dev setups only — the miner TCP ingress and `-tx-accept-privileged` were
-removed; see the gate note in the Overview. The current path is `send-block-push` →
-8727) and sends pairs of BRC-131 frames:
+(legacy/dev only; see [Miner port deprecation](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated)) and sends pairs of BRC-131 frames:
 
 1. **BlockAnnounce** (MsgType `0x01`): carries a random 80-byte block header, the block
    hash as ContentID (`SHA256d(blockHeader)`), and `subtrees` random subtree hashes appended
@@ -175,9 +167,7 @@ removed; see the gate note in the Overview. The current path is `send-block-push
 ## send-subtree-data
 
 `send-subtree-data` connects to a proxy TCP ingress that accepts privileged frames
-(legacy/dev setups only — the miner TCP ingress and `-tx-accept-privileged` were
-removed; see the gate note in the Overview. The current path is `send-subtree-push` →
-8726) and sends BRC-132
+(legacy/dev only; see [Miner port deprecation](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated)) and sends BRC-132
 frames with configurable `MsgType` (hashes-only or full-nodes), node count, and subtree
 ID pool.
 

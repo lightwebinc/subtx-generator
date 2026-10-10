@@ -95,19 +95,11 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 (BlockAnnounce + CoinbaseTx) for integration testing.
 
-> **Miner-tier gate:** BRC-131/132 multicast frames are privileged. The proxy's
-> miner TCP ingress (`-miner-tcp-listen-port`) and `-tx-accept-privileged` were
-> **removed (2026-07-07)** — this legacy sender works only against legacy/dev
-> setups that drive a privileged ingress class; the transaction ingress
-> silently drops these frames. The current path is the BRC-143/144 push lanes
-> (`send-subtree-push` → 8726, `send-block-push` → 8727). See the
-> [shard-proxy transaction-only ingress](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
-> Anchor frames (`send-anchor-frame`, BRC-134) and BRC-127 SubtreeGroupAnnounce
-> remain ungated.
+> Legacy privileged sender; see [Miner port deprecation](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames. See gate note above |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
 | `-blocks` | `10` | Number of simulated blocks to announce |
 | `-subtrees` | `4` | Subtree hashes per BlockAnnounce frame |
 | `-interval` | `100ms` | Delay between successive block pairs |
@@ -132,13 +124,11 @@ fabric), which is why this sender can still build it.
 ## send-subtree-data
 
 Connects to the proxy over TCP and sends BRC-132 subtree data frames for integration
-testing. BRC-132 frames are privileged — the miner-tier gate note under
-[send-block-announce](#send-block-announce) applies here too; the current path
-is `send-subtree-push` → 8726.
+testing. Legacy privileged sender; see [Miner port deprecation](https://github.com/lightwebinc/shard-proxy/blob/main/docs/configuration.md#ingress-is-transaction-only-miner-port-deprecated).
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames. See gate note above |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
 | `-frames` | `20` | Number of BRC-132 frames to send |
 | `-msg-type` | `hashes` | Payload type: `hashes` (hashes-only, 32 bytes/node) or `full` (full-nodes, 48 bytes/node) |
 | `-nodes` | `16` | Number of subtree nodes per frame |
