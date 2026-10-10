@@ -35,7 +35,7 @@ as zero; the proxy stamps them in-place before multicast forwarding.
   logs the sent direction too.
 - **Unified structured logging** — uses `shard-common/logging` (no more plain
   `log`); set `LOG_FORMAT=json` for JSON-on-stdout matching the rest of the
-  fleet. See the [Unified Logging Plan](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
+  fleet. See the [Unified Component Logging](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
 
 ## Install
 
