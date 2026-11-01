@@ -1,6 +1,6 @@
 // Command tunnel-sink is a consumer-side diagnostic sink for the tunnel
 // delivery plane. It listens on the consumer's SDA (service delivery
-// address, default :8833 — the standard Teranode propagation port), accepts
+// address, default :8833, the standard Teranode propagation port), accepts
 // the edge's push connections, and logs one line per delivered object:
 // timestamp, direction, interface, frame type (BRC #), class, object id,
 // and the class detail (tx payload size / subtree node count / block
@@ -65,7 +65,7 @@ const (
 	// unclassified before the best complete-object candidate is picked. It
 	// is the worst-case FIRST-OBJECT reporting delay for a sparse lane whose
 	// leading object is shorter than the block-candidate check window, so it
-	// must stay small — this is a diagnostic tool.
+	// must stay small; this is a diagnostic tool.
 	sniffSettle = 250 * time.Millisecond
 )
 

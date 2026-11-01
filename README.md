@@ -4,7 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/lightwebinc/subtx-generator.svg)](https://pkg.go.dev/github.com/lightwebinc/subtx-generator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> Part of the [**BSV Layered Multicast**](https://github.com/lightwebinc/bsv-multicast) open-source project — see the main repository for the full architecture, design docs, and BRC specifications.
+> Part of the [**BSV Layered Multicast**](https://github.com/lightwebinc/bsv-multicast) open-source project; see the main repository for the full architecture, design docs, and BRC specifications.
 
 Random BSV-over-UDP frame generator for load and functional testing of
 [`shard-proxy`](https://github.com/lightwebinc/shard-proxy)
@@ -17,25 +17,25 @@ as zero; the proxy stamps them in-place before multicast forwarding.
 
 ## Features
 
-- **Random BSV-shaped tx payloads** — shape-correct (version / vin / vout /
+- **Random BSV-shaped tx payloads**: shape-correct (version / vin / vout /
   locktime), seeded per worker, no shared PRNG contention.
-- **Subtree ID pool** — N deterministic 32-byte IDs derived from a user
+- **Subtree ID pool**: N deterministic 32-byte IDs derived from a user
   seed. Same seed ⇒ same IDs across runs, machines, and test scenarios.
-- **Sequence numbers** — shared atomic allocator with optional gap
+- **Sequence numbers**: shared atomic allocator with optional gap
   injection (permanent or delayed retransmission) to drive listener-side
   NACK / retry tests.
-- **Multi-core sender** — one UDP conn per worker, lock-free hot path,
-  token-bucket pacer (smooth at ≤ 1 kpps, burst mode above).
-- **Deterministic Subtree pick** — `SubtreeID = pool[uint64(TxID[:8]) % N]`
+- **Multi-core sender**: one UDP conn per worker, lock-free hot path,
+  ticker-paced emission (smooth at ≤ 1 kpps, millisecond bursts above).
+- **Deterministic Subtree pick**: `SubtreeID = pool[uint64(TxID[:8]) % N]`
   so listeners filtering on a single subtree see a predictable traffic
   fraction (≈ `1/N`).
-- **Consumer tunnel sink** — `tunnel-sink` receives and logs the tunnel
+- **Consumer tunnel sink**: `tunnel-sink` receives and logs the tunnel
   delivery lanes (tx / BRC-143 subtree / BRC-144 block) with per-object
   diagnostic lines and exit-time summary statistics; optional submit relay
   logs the sent direction too.
-- **Unified structured logging** — uses `shard-common/logging` (no more plain
-  `log`); set `LOG_FORMAT=json` for JSON-on-stdout matching the rest of the
-  fleet. See the [Unified Component Logging](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
+- **Unified structured logging**: uses `shard-common/logging`; set
+  `LOG_FORMAT=json` for JSON-on-stdout matching the rest of the fleet. See
+  [Unified Component Logging](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
 
 ## Install
 
@@ -69,22 +69,22 @@ Direct-multicast mode, gap injection, BRC-127 announce (incl. phased mode),
 ## Layout
 
 ```
-cmd/subtx-gen/            — CLI entry point (BRC-124/128 frame generator)
-cmd/send-block-announce/  — BRC-131 block announce sender (TCP, legacy)
-cmd/send-subtree-data/    — BRC-132 subtree data sender (TCP, legacy)
-cmd/send-anchor-frame/    — BRC-134 anchor transaction sender (UDP default, -tcp opt)
-cmd/send-subtree-push/    — BRC-143 subtree push sender (TCP, lane 8726)
-cmd/send-block-push/      — BRC-144 block push sender (TCP, lane 8727)
-cmd/tunnel-sink/          — consumer tunnel delivery sink + submit relay (diagnostic logger)
-scripts/exercise-lanes.sh — drive tx + subtree + block lanes at one edge concurrently
-internal/tx/              — exact-size walkable tx payload builder (raw + BRC-30 EF; never pads)
-internal/subtree/         — deterministic subtree-ID pool
-internal/seq/             — shared seq allocator + gap injector
-internal/frame/           — v1/v2 encoder wrapper around shard-common
-internal/rate/            — token-bucket pacer (smooth / burst)
-internal/sender/          — worker pool driving net.UDPConn per worker
-internal/announce/        — BRC-127 SubtreeGroupAnnounce TCP sender
-internal/blockhdr/        — synthetic PoW-valid 80-byte block-header builder
+cmd/subtx-gen/            CLI entry point (BRC-124/128 frame generator)
+cmd/send-block-announce/  BRC-131 block announce sender (TCP, legacy)
+cmd/send-subtree-data/    BRC-132 subtree data sender (TCP, legacy)
+cmd/send-anchor-frame/    BRC-134 anchor transaction sender (UDP default, -tcp opt)
+cmd/send-subtree-push/    BRC-143 subtree push sender (TCP, lane 8726)
+cmd/send-block-push/      BRC-144 block push sender (TCP, lane 8727)
+cmd/tunnel-sink/          consumer tunnel delivery sink + submit relay (diagnostic logger)
+scripts/exercise-lanes.sh drive tx + subtree + block lanes at one edge concurrently
+internal/tx/              exact-size walkable tx payload builder (raw + BRC-30 EF; never pads)
+internal/subtree/         deterministic subtree-ID pool
+internal/seq/             shared seq allocator + gap injector
+internal/frame/           v1/v2 encoder wrapper around shard-common
+internal/rate/            ticker-based pacer (smooth / burst)
+internal/sender/          worker pool driving net.UDPConn per worker
+internal/announce/        BRC-127 SubtreeGroupAnnounce TCP sender
+internal/blockhdr/        synthetic PoW-valid 80-byte block-header builder
 ```
 
 `send-block-announce` and `send-subtree-data` are legacy privileged senders; see
@@ -92,9 +92,9 @@ internal/blockhdr/        — synthetic PoW-valid 80-byte block-header builder
 
 ## Documentation
 
-- [Usage](docs/usage.md) — worked examples for every binary
-- [Configuration](docs/configuration.md) — every flag
-- [Architecture](docs/architecture.md) — pipeline position, frame generation, package structure
+- [Usage](docs/usage.md): worked examples for every binary
+- [Configuration](docs/configuration.md): every flag
+- [Architecture](docs/architecture.md): pipeline position, frame generation, package structure
 
 ## Container image
 
@@ -111,7 +111,7 @@ A Kubernetes Helm chart is published from a dedicated chart repository:
 - Repository: [`charts/subtx-generator`](https://github.com/lightwebinc/charts/tree/main/charts/subtx-generator)
 - Install: `helm install subtx-generator oci://ghcr.io/lightwebinc/charts/subtx-generator`
 
-The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` — see the chart README for the mode list. Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
+The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (see the chart README for the mode list). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
 
 ## Releases
 
@@ -119,4 +119,4 @@ Releases and release notes live on [GitHub Releases](https://github.com/lightweb
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

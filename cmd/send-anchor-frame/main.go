@@ -3,7 +3,7 @@
 //
 // Anchor frames use FrameVerV6 (0x06) with a 92-byte header identical to
 // BRC-124. The proxy stamps HashKey and SeqNum in-place and forwards the
-// frame to FF0E::B:FFFE (GroupBlockBroadcast).
+// frame to the GroupBlockBroadcast control group (index 0xFFFE).
 //
 // Usage:
 //
@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-// BRC-134 wire constants — mirror of shard-common/frame.
+// BRC-134 wire constants: mirror of shard-common/frame.
 const (
 	magicBSV   = 0xE3E1F3E8
 	protoVer   = 0x02BF
@@ -49,7 +49,7 @@ func main() {
 
 	// Anchors are plain transactions on a tx-class lane: the payload must be
 	// one WALKABLE tx of exactly -payload-size bytes with the canonical TxID
-	// (objfmt.TxID), never random bytes — random bytes desync a downstream
+	// (objfmt.TxID), never random bytes; random bytes desync a downstream
 	// TCP objfmt stream and stamp an id no consumer ever derives.
 	var seed [32]byte
 	mustRand(seed[:])
@@ -115,9 +115,9 @@ func encodeAnchorFrame(txid [32]byte, payload []byte) []byte {
 	buf[6] = frameVerV6
 	buf[7] = 0x00 // Reserved
 	copy(buf[8:40], txid[:])
-	// HashKey (40:48) = 0 — proxy stamps
-	// SeqNum  (48:56) = 0 — proxy stamps
-	// SubtreeID (56:88) = zeros — anchor frames have no subtree
+	// HashKey (40:48) = 0 (proxy stamps)
+	// SeqNum  (48:56) = 0 (proxy stamps)
+	// SubtreeID (56:88) = zeros (anchor frames have no subtree)
 	binary.BigEndian.PutUint32(buf[88:92], uint32(len(payload)))
 	copy(buf[92:], payload)
 	return buf

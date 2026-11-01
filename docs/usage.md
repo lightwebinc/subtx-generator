@@ -1,4 +1,4 @@
-# subtx-generator — Usage
+# subtx-generator Usage
 
 Worked examples for each binary. Every flag is listed in
 [configuration.md](configuration.md); internals are in
@@ -22,7 +22,7 @@ subtx-gen \
 ## direct-multicast mode (skip the proxy)
 
 ```bash
-# Emit directly to FF35::B:idx (SSM site scope) — useful for fabric
+# Emit directly to FF35::B:idx (SSM site scope); useful for fabric
 # load validation and SSM scenarios where the generator is the
 # data-plane publisher.
 # Operators MUST add -bind-source to the shard-manifest -publishers
@@ -38,17 +38,17 @@ subtx-gen \
   -pps 1000 -duration 30s
 ```
 
-See [bsv-multicast SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)
+See the [bsv-multicast Source-Specific Multicast design](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)
 for the full design.
 
 ## Gap injection (NACK / retransmit tests)
 
 ```bash
-# Permanent gap — every 500th seq number is skipped; listener reports
+# Permanent gap: every 500th seq number is skipped; the listener reports
 # bsl_gaps_detected_total and (after NACK retries exhausted) bsl_gaps_unrecovered_total.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
-# Delayed retransmit — listener sees a gap, emits a NACK, and the
+# Delayed retransmit: the listener sees a gap, emits a NACK, and the
 # generator resends the missing seq 50 ms later so bsl_gaps_suppressed_total
 # (or forwarded-after-recovery) should rise.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
@@ -70,7 +70,7 @@ subtx-gen \
   -pps 1000 -duration 30s
 ```
 
-### Phased mode — time-varying group membership
+### Phased mode (time-varying group membership)
 
 Set `-announce-phase-size` and `-announce-phase-interval` to add subtrees to
 the group incrementally. The sender starts with zero active subtrees and adds
@@ -109,7 +109,7 @@ subtx-gen \
 `tunnel-sink` is the receiving-side counterpart to the senders above: a
 consumer-side diagnostic sink for the tunnel delivery plane. It listens on the
 consumer's SDA (default `:8833`), auto-detects each connection's lane class
-(raw/EF tx, BRC-143 subtree, BRC-144 block — or a framed BRC-124 stream by
+(raw/EF tx, BRC-143 subtree, BRC-144 block, or a framed BRC-124 stream by
 network magic), and logs one line per object with timestamp, direction,
 interface, BRC number, class, object id, and the class detail (tx size /
 subtree node count / block subtree count). On exit (Ctrl-C) it prints
@@ -137,7 +137,7 @@ scripts/exercise-lanes.sh -host edge.example.net              # defaults
 scripts/exercise-lanes.sh -host ::1 -tx-pps 500 -tx-size 512 \
   -subtree-interval 250ms -block-interval 10s -duration 2m
 scripts/exercise-lanes.sh -host ::1 -port 8833                # ALL lanes to one
-  # port — for a lab tunnel-sink or the submit relay; a real edge admits
+  # port: for a lab tunnel-sink or the submit relay; a real edge admits
   # subtree/block only on its per-class ports (the miner-tier gate)
 ```
 
@@ -162,10 +162,8 @@ The single `gcr.io/distroless/static:nonroot` image carries all seven binaries:
 ```
 
 Images are published per release tag as
-`ghcr.io/lightwebinc/subtx-generator:<tag>` (the git tag without its `v`).
-Images from `0.3.0` onward (current `0.4.0`) carry all seven binaries;
-`0.2.10` to `0.2.x` lack `tunnel-sink`; earlier images carry only the first
-four.
+`ghcr.io/lightwebinc/subtx-generator:<tag>`, the git tag without its `v`
+(for example `ghcr.io/lightwebinc/subtx-generator:0.4.0`).
 
 **No `ENTRYPOINT` is set**: the consumer (Helm chart `mode` selector,
 `docker run --entrypoint=…`, Kubernetes `command:` field) picks which binary

@@ -5,7 +5,7 @@
 //
 //	SubtreeMerkleRoot(32) | NodeCount(8, BE) | NodeCount x NodeHash(32)
 //
-// The stream is bare and single-class — objects are self-delimited by NodeCount,
+// The stream is bare and single-class: objects are self-delimited by NodeCount,
 // with no outer length prefix or type tag. The proxy reframes each object into a
 // BRC-132 subtree-data multicast frame (hashes-only) and stamps HashKey/SeqNum
 // from the observed source; the in-band merkle root becomes the frame SubtreeID.
@@ -66,7 +66,7 @@ func main() {
 	rng := rand.NewChaCha8(sha256.Sum256([]byte(*seed)))
 
 	// Enforce -duration through the context so an idle lane exits AT the
-	// deadline, not at its next tick — a long -interval must not overrun the
+	// deadline, not at its next tick; a long -interval must not overrun the
 	// requested runtime (all lanes of a mixed run stop together).
 	if *duration > 0 {
 		var cancel context.CancelFunc

@@ -1,10 +1,10 @@
-# subtx-generator — Configuration Reference
+# subtx-generator Configuration Reference
 
 All parameters are accepted as CLI flags only, with one exception: every binary
 (`subtx-gen`, `send-block-announce`, `send-subtree-data`, `send-anchor-frame`,
 `send-subtree-push`, `send-block-push`, `tunnel-sink`)
 reads the `LOG_FORMAT` environment variable (`text` default | `json`) for
-unified structured logging via `shard-common/logging` — see the
+unified structured logging via `shard-common/logging`; see the
 [canonical logging doc](https://github.com/lightwebinc/shard-common/blob/main/docs/logging.md).
 
 ---
@@ -17,7 +17,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | Flag | Default | Description |
 |---|---|---|
 | `-addr` | `[::1]:8725` | Target `host:port` (UDP by default; TCP with `-tcp`) |
-| `-tcp` | `false` | Submit over TCP — the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. `-mode unicast` only |
+| `-tcp` | `false` | Submit over TCP, the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. `-mode unicast` only |
 | `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header) |
 | `-shard-bits` | `2` | Informational: shard-bits the proxy uses (for predicted-group diagnostic logging) |
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |
@@ -25,9 +25,9 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-pps` | `1000` | Target packets per second (0 = unlimited) |
 | `-duration` | `0` | Max run time. `0` (default) runs until `-count` is reached or SIGINT; if `>0`, stops at whichever of count or duration comes first |
 | `-count` | `0` | Stop after N frames (0 = unlimited) |
-| `-workers` | `runtime.NumCPU()` | Worker goroutine count (0 = NumCPU) |
-| `-payload-size` | `512` | Exact transaction payload size in bytes. Every payload is exactly one structurally valid tx of this size (sizing slack is absorbed inside the script fields, never as trailing padding — padding desyncs TCP objfmt streams). Minimum 75 for `brc128`/`mixed`, 60 for `brc124`; below-minimum sizes fail at startup |
-| `-payload-format` | `brc128` | Payload encoding: `brc128` (BRC-30 EF; default — the fabric is EF-native), `brc124` (raw tx; legacy/miner lanes), or `mixed`. The frame TxID is stamped canonically (`objfmt.TxID`, i.e. over the standard serialization — EF extras excluded) |
+| `-workers` | `0` | Worker goroutine count; 0 = `runtime.NumCPU()` |
+| `-payload-size` | `512` | Exact transaction payload size in bytes. Every payload is exactly one structurally valid tx of this size (sizing slack is absorbed inside the script fields, never as trailing padding, which desyncs TCP objfmt streams). Minimum 75 for `brc128`/`mixed`, 60 for `brc124`; below-minimum sizes fail at startup |
+| `-payload-format` | `brc128` | Payload encoding: `brc128` (BRC-30 EF; the default, because the fabric is EF-native), `brc124` (raw tx; legacy/miner lanes), or `mixed`. The frame TxID is stamped canonically (`objfmt.TxID`, i.e. over the standard serialization with the EF extras excluded) |
 | `-seq-start` | `1` | First sequence number |
 | `-seq-gap-every` | `0` | Inject a gap every N frames; 0 = disabled |
 | `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap |
@@ -41,7 +41,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
 | `-announce-phase-interval` | `0` | Phase tick interval; 0 = phased mode disabled |
 | `-corrupt-txid-rate` | `0` | Percentage of frames with a corrupted TxID field (0–100); for listener payload-hash verification tests |
-| `-mode` | `unicast` | Send mode: `unicast` (default — forward to proxy via `-addr`) or `direct-multicast` (skip the proxy and emit directly to the SSM data plane; see [SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)). |
+| `-mode` | `unicast` | Send mode: `unicast` (default; forward to the proxy via `-addr`) or `direct-multicast` (skip the proxy and emit directly to the SSM data plane; see [Source-Specific Multicast design](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm)). |
 | `-bind-source` | `""` | direct-multicast: IPv6 literal bound on every egress socket. Required when `-mode=direct-multicast`. MUST be added to the shard-manifest publishers list so receivers' `(S,G)` joins include this generator. |
 | `-egress-iface` | `""` | direct-multicast: outbound interface for multicast egress (used for `IPV6_MULTICAST_IF`). |
 | `-source-mode` | `asm` | direct-multicast: addressing model `asm` or `ssm` (selects FF05/FF35/FF3E prefix via `shard.Prefix`). |
@@ -69,21 +69,21 @@ data-plane publisher.
 
 Three flags control gap injection:
 
-- **`-seq-gap-every N`** — the allocator skips `seq-gap-size` sequence numbers every N
+- **`-seq-gap-every N`**: the allocator skips `seq-gap-size` sequence numbers every N
   allocated sequences. Setting N=500 creates one gap per 500 frames.
-- **`-seq-gap-size S`** — how many consecutive sequence numbers to skip per gap event.
+- **`-seq-gap-size S`**: how many consecutive sequence numbers to skip per gap event.
   The listener opens S individual gap entries.
-- **`-seq-gap-delay D`** — if non-zero, the allocator resends the skipped sequence(s)
+- **`-seq-gap-delay D`**: if non-zero, the allocator resends the skipped sequence(s)
   after duration D. A value of `0` (the default) creates a permanent gap that exhausts
   all NACK retries and increments `bsl_gaps_unrecovered_total`. A value such as `50ms`
   creates a delayed retransmit that should suppress the NACK via `bsl_gaps_suppressed_total`.
 
-Example — permanent gap:
+Permanent gap:
 ```
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 ```
 
-Example — delayed retransmit (NACK recovery test):
+Delayed retransmit (NACK recovery test):
 ```
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 ```
@@ -99,7 +99,7 @@ Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`). Legacy default: the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
 | `-blocks` | `10` | Number of simulated blocks to announce |
 | `-subtrees` | `4` | Subtree hashes per BlockAnnounce frame |
 | `-interval` | `100ms` | Delay between successive block pairs |
@@ -108,7 +108,7 @@ Connects to the proxy over TCP and sends BRC-131 block control frame pairs
 Each BlockAnnounce carries a random 80-byte block header with ContentID set to
 `SHA256d(blockHeader)`. When `-coinbase=true`, a CoinbaseTx frame follows immediately
 with a structurally valid (walkable) coinbase transaction and its canonical TxID
-(`objfmt.TxID`) as ContentID — never random bytes, which would desync a
+(`objfmt.TxID`) as ContentID; random bytes would desync a
 downstream tx-class objfmt stream.
 
 The standalone CoinbaseTx frame is deprecated: production producers never
@@ -128,7 +128,7 @@ testing. Legacy privileged sender; see [Miner port deprecation](https://github.c
 
 | Flag | Default | Description |
 |---|---|---|
-| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`) — legacy default; the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
+| `-addr` | `[::1]:9002` | Proxy TCP address (`host:port`). Legacy default: the OSS proxy's `-tcp-listen-port` defaults to 0 (disabled) and drops privileged frames |
 | `-frames` | `20` | Number of BRC-132 frames to send |
 | `-msg-type` | `hashes` | Payload type: `hashes` (hashes-only, 32 bytes/node) or `full` (full-nodes, 48 bytes/node) |
 | `-nodes` | `16` | Number of subtree nodes per frame |
@@ -140,7 +140,7 @@ testing. Legacy privileged sender; see [Miner port deprecation](https://github.c
 
 ## send-anchor-frame
 
-Sends BRC-134 anchor transaction frames (`FrameVerV6`) to the proxy — UDP by default
+Sends BRC-134 anchor transaction frames (`FrameVerV6`) to the proxy: UDP by default
 (matching the BRC-124/128 data path), or TCP with `-tcp`. Anchor frames are **not**
 subject to the miner-tier ingress gate; the consumer ingress accepts them.
 
@@ -148,7 +148,7 @@ subject to the miner-tier ingress gate; the consumer ingress accepts them.
 |---|---|---|
 | `-addr` | `[::1]:8725` | Proxy address (`host:port`); UDP by default |
 | `-count` | `10` | Number of anchor frames to send |
-| `-payload-size` | `256` | Exact anchor tx payload size in bytes — one structurally valid raw tx of exactly this size (min 60), TxID = `objfmt.TxID` |
+| `-payload-size` | `256` | Exact anchor tx payload size in bytes: one structurally valid raw tx of exactly this size (min 60), TxID = `objfmt.TxID` |
 | `-interval` | `50ms` | Delay between frames |
 | `-tcp` | `false` | Send over TCP instead of UDP (point `-addr` at the proxy's `-tcp-listen-port`) |
 
@@ -157,7 +157,7 @@ subject to the miner-tier ingress gate; the consumer ingress accepts them.
 ## send-subtree-push
 
 Streams BRC-143 subtree push objects (header-stripped, self-delimiting) to the
-proxy's tunnel-bound subtree push lane (standard 8726) over TCP — the current
+proxy's tunnel-bound subtree push lane (standard 8726) over TCP, the current
 path for miner subtree ingest. The proxy reframes each object into a BRC-132
 multicast frame.
 
@@ -182,7 +182,7 @@ with the root as the `SubtreeID`.
 ## send-block-push
 
 Streams BRC-144 block push objects to the proxy's tunnel-bound block push lane
-(standard 8727) over TCP — the current path for miner block ingest.
+(standard 8727) over TCP, the current path for miner block ingest.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -210,7 +210,7 @@ per-class session statistics on SIGINT/SIGTERM.
 
 | Flag | Default | Description |
 |---|---|---|
-| `-listen` | `:8833` | Delivery listen address — the consumer SDA (empty host = all interfaces; 8833 is the standard Teranode propagation port) |
+| `-listen` | `:8833` | Delivery listen address, the consumer SDA (empty host = all interfaces; 8833 is the standard Teranode propagation port) |
 | `-lane` | `auto` | Force the delivery lane class: `auto\|tx\|subtree\|block` (auto = per-connection sniff) |
 | `-summary` | `true` | Print session summary statistics on exit |
 | `-max-object` | `268435456` | Maximum single object size in bytes (256 MiB) |

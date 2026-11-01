@@ -9,7 +9,7 @@ import (
 
 // TestSetBitsByteOrder pins the defect that motivated this package: nBits is a
 // little-endian header field, and a big-endian write produces a compact value
-// with the sign bit set, which CompactToTarget rejects outright — so every
+// with the sign bit set, which CompactToTarget rejects outright, so every
 // announce fails the gate rather than merely being hard to satisfy.
 func TestSetBitsByteOrder(t *testing.T) {
 	hdr := make([]byte, Len)
@@ -53,7 +53,7 @@ func TestGrindSatisfiesGate(t *testing.T) {
 }
 
 // TestGrindLeavesHeaderOtherwiseIntact guards against Grind clobbering fields a
-// caller already set — only the nonce may move.
+// caller already set; only the nonce may move.
 func TestGrindLeavesHeaderOtherwiseIntact(t *testing.T) {
 	hdr := make([]byte, Len)
 	for i := range hdr {

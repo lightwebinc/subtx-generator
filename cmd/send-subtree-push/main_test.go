@@ -19,7 +19,7 @@ func TestBuildSubtree_DelimitsAndReframes(t *testing.T) {
 	for _, nodes := range []int{1, 16, 1000} {
 		obj, root := buildSubtree(rng, nodes, true)
 
-		// Exact self-delimiting length — the proxy's objfmt.Reader relies on it.
+		// Exact self-delimiting length; the proxy's objfmt.Reader relies on it.
 		n, err := objfmt.SubtreeSize(obj)
 		if err != nil || n != len(obj) {
 			t.Fatalf("nodes=%d: SubtreeSize=%d len=%d err=%v", nodes, n, len(obj), err)

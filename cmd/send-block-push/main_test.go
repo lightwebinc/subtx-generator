@@ -27,7 +27,7 @@ func TestBuildBlock_DelimitsAndReframes(t *testing.T) {
 			if err != nil || n != len(obj) {
 				t.Fatalf("subtrees=%d bump=%d: BlockSize=%d len=%d err=%v", subtrees, bump, n, len(obj), err)
 			}
-			// Block hash identity = SHA256d(header[:80]) — how the proxy derives ContentID.
+			// Block hash identity = SHA256d(header[:80]), how the proxy derives ContentID.
 			h1 := sha256.Sum256(obj[:blockHeaderLen])
 			want := sha256.Sum256(h1[:])
 			if want != blockHash {

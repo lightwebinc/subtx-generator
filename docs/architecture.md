@@ -1,4 +1,4 @@
-# subtx-generator — Architecture
+# subtx-generator Architecture
 
 ## Overview
 
@@ -16,8 +16,9 @@ BRC-143, and BRC-144 senders for `shard-proxy`), and the `tunnel-sink` receiver.
 optional `-tcp` flag; anchor frames (BRC-134) and BRC-127 SubtreeGroupAnnounce
 remain ungated.
 
-`subtx-generator` is a **test tool, not a production component**. It sends frames
-only; it never joins multicast groups or receives frames.
+`subtx-generator` is a **test tool, not a production component**. The senders
+never join multicast groups or receive frames; `tunnel-sink` is the one receiving-side
+binary (a TCP consumer sink).
 
 ## Pipeline Position
 
@@ -28,12 +29,12 @@ subtx-generator (subtx-gen)
 shard-proxy  ──multicast──►  shard-listener
 
 subtx-generator (send-block-announce)
-      │  BRC-131 frames (TCP — legacy; miner port removed, use send-block-push)
+      │  BRC-131 frames (TCP; legacy, miner port removed, use send-block-push)
       ▼
 shard-proxy  ──GroupBlockBroadcast──►  shard-listener
 
 subtx-generator (send-subtree-data)
-      │  BRC-132 frames (TCP — legacy; miner port removed, use send-subtree-push)
+      │  BRC-132 frames (TCP; legacy, miner port removed, use send-subtree-push)
       ▼
 shard-proxy  ──GroupSubtreeDataAnnounce──►  shard-listener
 
@@ -93,13 +94,13 @@ default `unicast` mode. `shard-proxy` stamps them in-place before
 multicast forwarding.
 
 In `-mode=direct-multicast` (see
-[SSM Support Plan](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm))
+[Source-Specific Multicast design](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm))
 the proxy is bypassed and the generator stamps both fields itself:
 
 - **SeqNum** is allocated per `(groupIdx, subtreeID)` flow from an
   internal `seq.PerFlowAllocator` so each flow has its own monotonic
-  counter — matching what `shard-proxy` would have produced.
-- **HashKey** is `XXH64(bindSource ∥ groupIdx ∥ subtreeID)` — the
+  counter, matching what `shard-proxy` would have produced.
+- **HashKey** is `XXH64(bindSource ∥ groupIdx ∥ subtreeID)`, the
   same identity the listener computes for any other publisher, derived
   from the generator's `-bind-source`. Operators MUST add
   `-bind-source` to the `shard-manifest -publishers` list so receivers'
@@ -110,9 +111,10 @@ Each worker opens its own IPv6 multicast egress socket bound to
 `shard.Engine.Addr(groupIdx, -egress-port)`, and writes directly to
 `(S=-bind-source, G)`.
 
-**Rate pacing:** the `rate.Bucket` token-bucket pacer issues one token per millisecond.
-Below ~1 kpps each send is followed by a sleep; above that threshold, frames are sent in
-batches until the bucket is empty, then a single longer sleep occurs.
+**Rate pacing:** `rate.New(pps)` returns a ticker-based pacer. At or below 1000 pps each
+send waits on a ticker with period `1/pps`; above that, the pacer releases `pps/1000` sends
+per millisecond tick, which keeps syscall overhead low without pinning a CPU. `-pps 0`
+disables pacing.
 
 ## Gap Injection
 
@@ -134,7 +136,7 @@ and ultimately increments `bsl_gaps_unrecovered_total` on the listener.
 When both `-announce-addr` and `-subtree-group` are set, an `announce.Sender` goroutine
 connects to the proxy's TCP ingress and periodically sends BRC-127 SubtreeGroupAnnounce
 datagrams (64 bytes each) for all subtree IDs in the pool that belong to the configured
-group(s). The proxy's `handleConn` recognises the SubtreeGroupAnnounce MsgType byte (`0x30`) and
+group(s). The proxy's `handleConn` recognizes the SubtreeGroupAnnounce MsgType byte (`0x30`) and
 forwards it via `ForwardControl` to `GroupSubtreeGroupAnnounce` (0xFFFC) without stamping.
 
 The re-announce ticker fires at `-announce-interval` to refresh TTLs of already-active
@@ -195,9 +197,9 @@ integration scenarios 36 (delivery) and 37 (retransmit) in
 ## tunnel-sink
 
 `tunnel-sink` is the only receiving-side binary in the repo: a consumer-side
-diagnostic sink for the commercial tunnel delivery plane (RR SDA push). The
+diagnostic sink for the consumer tunnel delivery plane (RR SDA push). The
 edge listener dials out to the consumer's published SDA and pushes bare,
-single-class, self-delimiting objects (`shard-common/objfmt`) — one TCP
+single-class, self-delimiting objects (`shard-common/objfmt`), one TCP
 connection per elected lane. `tunnel-sink` plays the consumer role: it
 listens (default `:8833`), classifies each accepted connection by walking
 the buffered prefix with each candidate codec (tx version word, BRC-143
@@ -208,7 +210,7 @@ diagnostic line per object.
 With `-submit-edge` it also covers the sent direction: a local submit
 listener classifies the submitted stream the same way, relays it verbatim
 to the edge ingress lane that matches the class (tx 8725 / subtree 8726 /
-block 8727 — framed streams ride the tx port, whose grammar the proxy
+block 8727; framed streams ride the tx port, whose grammar the proxy
 magic-detects), and logs each relayed object as `SENT`. Delivery and
 ingress lanes are one-way; the relay drains the edge side only to observe
 close.

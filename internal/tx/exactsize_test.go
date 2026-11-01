@@ -76,7 +76,7 @@ func TestExactSizeAgainstObjfmt(t *testing.T) {
 // TestConcatenatedStreamWalks proves the TCP-lane property end to end: a
 // back-to-back stream of N generated payloads (both formats interleaved,
 // varied sizes) must split cleanly into exactly N objects with the real
-// objfmt.Reader — the same delimiting a consumer SDA performs.
+// objfmt.Reader, the same delimiting a consumer SDA performs.
 func TestConcatenatedStreamWalks(t *testing.T) {
 	var seed [32]byte
 	seed[0] = 11

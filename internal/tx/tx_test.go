@@ -59,7 +59,7 @@ func TestBuilderBelowMinErrors(t *testing.T) {
 
 func TestSplitSlackCoversAllTotals(t *testing.T) {
 	// Every slack in the canonical-varint boundary neighbourhoods (and a
-	// broad low range) must be exactly representable — the class of bug
+	// broad low range) must be exactly representable; the class of bug
 	// being fixed is a size that silently could not be represented.
 	check := func(s int) {
 		t.Helper()

@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-// BRC-132 wire constants — mirror of shard-common/frame.
+// BRC-132 wire constants: mirror of shard-common/frame.
 const (
 	magicBSV   = 0xE3E1F3E8
 	protoVer   = 0x02BF
@@ -127,7 +127,7 @@ func main() {
 }
 
 // encodeSubtreeDataFrame builds a BRC-132 wire frame.
-// HashKey (40:48) and SeqNum (48:56) are left zero — the proxy stamps them.
+// HashKey (40:48) and SeqNum (48:56) are left zero; the proxy stamps them.
 // subtree is one generated subtree: its BRC-132 payload and merkle root.
 type subtree struct {
 	root    [32]byte

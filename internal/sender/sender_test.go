@@ -130,7 +130,7 @@ func TestRunRejectsPayloadBelowFormatMinimum(t *testing.T) {
 // TestWireFramesCarryExactEFTxAndCanonicalTxID captures emitted datagrams and
 // asserts, per frame: the payload is EXACTLY one valid tx of the requested
 // size (the property whose violation desyncs TCP objfmt streams) and the
-// stamped TxID equals objfmt.TxID(payload) — the canonical id (ToStandard for
+// stamped TxID equals objfmt.TxID(payload), the canonical id (ToStandard for
 // EF), matching what the proxy's bare-tx path stamps and consumers dedup on.
 func TestWireFramesCarryExactEFTxAndCanonicalTxID(t *testing.T) {
 	t.Parallel()

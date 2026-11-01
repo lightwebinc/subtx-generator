@@ -1,7 +1,7 @@
 // Command subtx-gen generates random BSV-over-UDP frames for load/functional
 // testing of shard-proxy and shard-listener.
 //
-// See README.md for the full flag set. Example:
+// See docs/configuration.md for the full flag set. Example:
 //
 //	subtx-gen -addr [fd20::2]:8725 -shard-bits 2 -subtrees 8 -pps 1000 -duration 10s
 package main

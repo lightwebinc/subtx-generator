@@ -32,10 +32,10 @@ const MinEFSize = 75
 // The sizing slack goes into the output locking script (plus a 0–2 byte
 // unlocking-script shim for CompactSize boundary totals, same scheme as
 // Build); the EF prev-locking-script stays empty. Scripts are deterministic
-// pseudo-random bytes — shape-correct, not consensus-valid.
+// pseudo-random bytes: shape-correct, not consensus-valid.
 //
 // Returns an error when targetSize < MinEFSize or the size is not exactly
-// representable — it NEVER pads outside the tx structure.
+// representable; it NEVER pads outside the tx structure.
 func (b *Builder) BuildEF(dst []byte, targetSize int) ([]byte, error) {
 	if targetSize < MinEFSize {
 		return nil, fmt.Errorf("tx: payload size %d below BRC-30 EF minimum %d", targetSize, MinEFSize)
