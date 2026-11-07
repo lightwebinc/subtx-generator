@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-// BRC-131 wire constants — mirror of shard-common/frame.
+// BRC-131 wire constants, mirror of shard-common/frame.
 const (
 	magicBSV       = 0xE3E1F3E8
 	protoVer       = 0x02BF
@@ -55,7 +55,7 @@ func main() {
 
 	// Coinbase payloads are plain transactions: build one WALKABLE tx of the
 	// exact target size with the canonical TxID (objfmt.TxID), never random
-	// bytes — random bytes desync a downstream tx-class objfmt stream and
+	// bytes, random bytes desync a downstream tx-class objfmt stream and
 	// stamp an id no consumer ever derives.
 	var seed [32]byte
 	mustRand(seed[:])
@@ -125,8 +125,8 @@ func encodeBlockFrame(msgType byte, contentID [32]byte, payload []byte) []byte {
 	buf[6] = frameVerV4
 	buf[7] = msgType
 	copy(buf[8:40], contentID[:])
-	// HashKey (40:48) = 0 — proxy stamps
-	// SeqNum  (48:56) = 0 — proxy stamps
+	// HashKey (40:48) = 0, proxy stamps
+	// SeqNum  (48:56) = 0, proxy stamps
 	// Reserved32 (56:88) = 0
 	binary.BigEndian.PutUint32(buf[88:92], uint32(len(payload)))
 	copy(buf[92:], payload)

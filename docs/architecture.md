@@ -69,7 +69,7 @@ subtx-generator/
   internal/subtree/        Deterministic subtree-ID pool (seed → N stable 32-byte IDs)
   internal/seq/            Shared atomic sequence allocator with gap injection
   internal/frame/          BRC-124/128 encoder wrapper around shard-common
-  internal/rate/           Token-bucket pacer (smooth at ≤1 kpps, burst mode above)
+  internal/rate/           Ticker-based pacer (smooth at ≤1 kpps, burst mode above)
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
   internal/announce/       BRC-127 SubtreeGroupAnnounce TCP sender
   internal/blockhdr/       Synthetic PoW-valid 80-byte block-header builder

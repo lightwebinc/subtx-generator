@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# exercise-lanes.sh — drive every push format at one edge endpoint at once:
+# exercise-lanes.sh: drive every push format at one edge endpoint at once:
 #
 #   tx      subtx-gen -tcp        -> TX_PORT      (default 8725) continuous stream
 #   subtree send-subtree-push     -> SUBTREE_PORT (default 8726) one per interval

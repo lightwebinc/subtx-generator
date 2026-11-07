@@ -99,7 +99,7 @@ internal/blockhdr/        synthetic PoW-valid 80-byte block-header builder
 ## Container image
 
 Images are published per release tag as
-`ghcr.io/lightwebinc/subtx-generator:<tag>` (current `0.4.0`): one
+`ghcr.io/lightwebinc/subtx-generator:<tag>`: one
 `gcr.io/distroless/static:nonroot` image with all seven binaries and no
 `ENTRYPOINT`, so the caller picks the binary. See
 [docs/usage.md § Container image](docs/usage.md#container-image).

@@ -2,11 +2,11 @@
 // generation. Output layout matches the BSV P2P "tx" message body:
 // version (4 LE) | vin_count (varint) | vin[] | vout_count (varint) | vout[] | locktime (4 LE).
 //
-// This is not consensus-valid — scripts are random bytes. It is shape-correct
+// This is not consensus-valid, scripts are random bytes. It is shape-correct
 // so any downstream parser that walks the structure sees plausible data.
 //
 // Exact-size invariant: for any targetSize >= the format minimum the emitted
-// payload is EXACTLY one structurally valid transaction of targetSize bytes —
+// payload is EXACTLY one structurally valid transaction of targetSize bytes,
 // the slack is absorbed INSIDE the structure (script bytes), never appended as
 // trailing padding. Trailing padding is invisible on a datagram lane (datagram
 // boundary == object boundary) but desynchronises a TCP objfmt stream at the
@@ -80,8 +80,8 @@ func putVarint(dst []byte, off, v int) int {
 //	cost(shim) + cost(bulk) == slack, where cost(L) = L + varintSize(L) - 1
 //
 // (the format minimum already counts one varint byte per script). A single
-// script cannot hit every total — canonical CompactSize jumps 1→3 bytes at
-// L=253 and 3→5 at L=65536, leaving 2-byte-wide unreachable gaps — so the
+// script cannot hit every total, canonical CompactSize jumps 1→3 bytes at
+// L=253 and 3→5 at L=65536, leaving 2-byte-wide unreachable gaps, so the
 // shim script absorbs 1–2 bytes whenever the bulk script lands in a gap.
 // Every slack >= 0 (up to the 5-byte varint ceiling) is therefore exactly
 // representable; anything else is an error, never silent padding.
@@ -108,7 +108,7 @@ func splitSlack(slack int) (shim, bulk int, err error) {
 // The transaction is 1-input/1-output; the sizing slack goes into the output
 // locking script (plus a 0–2 byte unlocking-script shim for CompactSize
 // boundary totals). Returns an error when targetSize < MinRawSize or the size
-// is not exactly representable — it NEVER pads outside the tx structure.
+// is not exactly representable, it NEVER pads outside the tx structure.
 func (b *Builder) Build(dst []byte, targetSize int) ([]byte, error) {
 	if targetSize < MinRawSize {
 		return nil, fmt.Errorf("tx: payload size %d below BRC-12 raw minimum %d", targetSize, MinRawSize)

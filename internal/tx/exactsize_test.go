@@ -60,7 +60,7 @@ func TestExactSizeAgainstObjfmt(t *testing.T) {
 				t.Fatalf("%s size=%d: objfmt.TxSize: %v", f.name, size, err)
 			}
 			if n != size {
-				t.Fatalf("%s size=%d: objfmt.TxSize walked %d bytes — %d bytes of padding outside the tx",
+				t.Fatalf("%s size=%d: objfmt.TxSize walked %d bytes, %d bytes of padding outside the tx",
 					f.name, size, n, size-n)
 			}
 			if got := objfmt.IsEF(out); got != f.ef {

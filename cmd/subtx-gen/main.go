@@ -37,7 +37,7 @@ var Version = "dev"
 func main() {
 	var (
 		addr                  = flag.String("addr", "[::1]:8725", "target host:port (UDP by default; TCP with -tcp)")
-		tcp                   = flag.Bool("tcp", false, "submit over TCP — the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. -mode unicast only.")
+		tcp                   = flag.Bool("tcp", false, "submit over TCP, the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. -mode unicast only.")
 		frameVer              = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
 		shardBits             = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
@@ -47,7 +47,7 @@ func main() {
 		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
 		workers               = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
 		payloadSize           = flag.Int("payload-size", 512, "exact transaction payload size in bytes (each payload is one valid tx of exactly this size; min 75 for brc128/mixed, 60 for brc124)")
-		payloadFormat         = flag.String("payload-format", "brc128", "payload encoding: brc128 (BRC-30 EF; default — the fabric is EF-native), brc124 (raw tx; legacy/miner lanes), or mixed")
+		payloadFormat         = flag.String("payload-format", "brc128", "payload encoding: brc128 (BRC-30 EF; default, the fabric is EF-native), brc124 (raw tx; legacy/miner lanes), or mixed")
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
 		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
 		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
@@ -70,7 +70,7 @@ func main() {
 		egressPort            = flag.Int("egress-port", 9001, "direct-multicast: destination UDP port for multicast datagrams")
 	)
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "subtx-gen %s — BSV frame load generator\n\n", Version)
+		fmt.Fprintf(os.Stderr, "subtx-gen %s: BSV frame load generator\n\n", Version)
 		fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n\nFlags:\n", os.Args[0])
 		flag.PrintDefaults()
 	}

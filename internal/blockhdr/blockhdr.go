@@ -5,8 +5,8 @@
 // runs pow.CheckHeader on every BRC-131 announce: the header's compact nBits
 // must expand to a valid target no easier than the operator's floor, and
 // SHA256d(header) must fall at or below that target. A synthetic emitter that
-// fills those fields with random bytes — or serialises nBits in the wrong byte
-// order — produces headers the fabric drops, which presents as blocks silently
+// fills those fields with random bytes, or serialises nBits in the wrong byte
+// order, produces headers the fabric drops, which presents as blocks silently
 // never arriving rather than as an emitter fault.
 //
 // The gate's own implementation is the reference: this package calls
@@ -53,14 +53,14 @@ func SetBits(hdr []byte, bits uint32) {
 // reproducible); the nonce wraps, so the whole 2^32 space is tried before
 // giving up and returning the hash of the last candidate.
 //
-// The floor passed to pow.CheckHeader is nil — the header need only satisfy the
+// The floor passed to pow.CheckHeader is nil, the header need only satisfy the
 // difficulty it claims. An operator floor is a separate, stricter admission
 // test; an emitter that claims [BitsRegtest] against a mainnet floor is
 // correctly rejected, and grinding harder would not change that.
 //
 // At [BitsRegtest] the expected number of tries is about two. Grind is
 // therefore safe on a generator's hot path at lab difficulty, and deliberately
-// NOT safe at mainnet difficulty — synthetic emitters are a lab instrument.
+// NOT safe at mainnet difficulty, synthetic emitters are a lab instrument.
 func Grind(hdr []byte, start uint32) [32]byte {
 	nonce := start
 	for i := int64(0); i < 1<<32; i++ {
@@ -73,7 +73,7 @@ func Grind(hdr []byte, start uint32) [32]byte {
 	return Hash(hdr)
 }
 
-// Hash returns SHA256d(hdr) — the block hash, in the internal little-endian
+// Hash returns SHA256d(hdr), the block hash, in the internal little-endian
 // byte order block hashes are compared and stored in.
 func Hash(hdr []byte) [32]byte {
 	h1 := sha256.Sum256(hdr)

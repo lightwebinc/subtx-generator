@@ -47,7 +47,7 @@ const (
 	// lanes). Frames carrying BRC-124 payloads are "BRC-124 frames".
 	PayloadBRC124 PayloadFormat = iota
 	// PayloadBRC128 emits BRC-30 Extended Format (EF) transaction payloads
-	// (the CLI default — the fabric is EF-native). Frames carrying EF
+	// (the CLI default, the fabric is EF-native). Frames carrying EF
 	// payloads are "BRC-128 frames".
 	PayloadBRC128
 	// PayloadMixed alternates between BRC-124 and BRC-128 payloads on a
@@ -58,7 +58,7 @@ const (
 
 // MinPayloadSize returns the smallest valid -payload-size for p. Every
 // emitted payload is EXACTLY one structurally valid transaction (no trailing
-// padding — padding desyncs TCP objfmt streams), so the floor is the format's
+// padding, padding desyncs TCP objfmt streams), so the floor is the format's
 // minimum tx size. PayloadMixed emits both formats at one size and therefore
 // takes the larger (EF) floor.
 func (p PayloadFormat) MinPayloadSize() int {
@@ -276,7 +276,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		// larger segments so the generator pays one syscall per BURST instead
 		// of one per tx, and the proxy reads more frames per recv (denser
 		// coalescing). Flushed when the token burst drains (see below), so a
-		// tx is never held once the pacer has nothing more queued — latency is
+		// tx is never held once the pacer has nothing more queued, latency is
 		// bounded by the burst, not the buffer. UDP stays unbuffered (datagrams).
 		if r.cfg.TCP {
 			tcpW = bufio.NewWriterSize(uconn, 128*1024)
@@ -373,7 +373,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		// Stamp the canonical TxID exactly as the system derives it
 		// (objfmt.TxID = SHA256d over the STANDARD serialization): for a
 		// BRC-12 raw payload that is SHA256d(payload); for a BRC-30 EF
-		// payload the marker and per-input extensions are excluded — the
+		// payload the marker and per-input extensions are excluded, the
 		// same id the proxy stamps on the bare-tx push path
 		// (objfmt.MulticastFrame) and the id consumers dedup on. Hashing
 		// the raw EF bytes instead would stamp an id no other component
@@ -450,7 +450,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			// every frame and defeat batching. The paced-idle flush (PPS > 0,
 			// no token queued) bounds per-frame LATENCY at paced rates: with
 			// per-worker connections a paced worker may buffer for many
-			// seconds before reaching the size threshold — frames must leave
+			// seconds before reaching the size threshold, frames must leave
 			// when the pacer has nothing more queued, or a paced run delivers
 			// only end-of-run flushes. The tail (< threshold) is drained by
 			// the deferred Flush at run end, so no frame is dropped and

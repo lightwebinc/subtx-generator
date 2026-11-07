@@ -8,7 +8,7 @@
 //	SubtreeCount x SubtreeRoot(32) | InlineCoinbaseTx(self-delimiting) |
 //	Height(8,BE) | CoinbaseBUMPLen(8,BE) | CoinbaseBUMP(bytes)
 //
-// The stream is bare and single-class — objects are self-delimited by their own
+// The stream is bare and single-class, objects are self-delimited by their own
 // counts, no outer framing. The proxy carries the whole BRC-144 body VERBATIM as
 // the payload of a BRC-131 block-control frame (no lossy BlockAnnounce
 // projection) and stamps HashKey/SeqNum from the observed source.
@@ -22,7 +22,7 @@
 // (-require-block-pow) is on by default on both proxy and listener, so the
 // nonce is ground until pow.CheckHeader passes (a couple of tries at that
 // difficulty). A header claiming 0x207fffff is still rejected by a fabric whose
-// floor is stricter — match -min-pow-bits to the network being driven. Every
+// floor is stricter, match -min-pow-bits to the network being driven. Every
 // object is self-verified with objfmt.BlockSize before it is written.
 //
 // Usage:
@@ -82,7 +82,7 @@ func main() {
 	txb := tx.New(sha256.Sum256([]byte(*seed + ":coinbase")))
 
 	// Enforce -duration through the context so an idle lane exits AT the
-	// deadline, not at its next tick — a long -interval (one block per
+	// deadline, not at its next tick, a long -interval (one block per
 	// minute) must not overrun the requested runtime (all lanes of a mixed
 	// run stop together).
 	if *duration > 0 {
@@ -149,7 +149,7 @@ func main() {
 }
 
 // buildBlock constructs one BRC-144 block push object. It returns the object,
-// the block hash (SHA256d of the 80-byte header — the object's identity for the
+// the block hash (SHA256d of the 80-byte header, the object's identity for the
 // hash proof, matching how the proxy derives ContentID), and the inline
 // coinbase TxID.
 func buildBlock(rng *rand.ChaCha8, txb *tx.Builder, subtrees, coinbaseSize, bumpSize int, height uint64, prevHash [32]byte) ([]byte, [32]byte, [32]byte) {
@@ -166,7 +166,7 @@ func buildBlock(rng *rand.ChaCha8, txb *tx.Builder, subtrees, coinbaseSize, bump
 	copy(hdr[36:68], mr[:])
 	binary.LittleEndian.PutUint32(hdr[68:72], uint32(1700000000+height)) // monotone stand-in time
 	// nBits is serialised LITTLE-endian, like every other multi-byte header
-	// field — pow.NBits reads it that way. Writing it big-endian yields the
+	// field, pow.NBits reads it that way. Writing it big-endian yields the
 	// compact value 0xffff7f20, whose sign bit is set, so CompactToTarget
 	// rejects it and EVERY announce fails -require-block-pow.
 	blockhdr.SetBits(hdr, blockhdr.BitsRegtest) // regtest-easy bits
