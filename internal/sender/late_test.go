@@ -2,7 +2,9 @@ package sender
 
 import (
 	"context"
+	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +40,7 @@ func TestBuildLateFillsTheFlow(t *testing.T) {
 		b := r.newLateBuilder([32]byte{7})
 		for g := uint32(0); g < 1<<bits; g++ {
 			l := seq.Late{Flow: seq.FlowKey{GroupIdx: g, SubtreeID: [32]byte{byte(g), 0xee}}, Seq: 100 + uint64(g)}
-			n, err := r.buildLate(b, l)
+			n, err := r.buildLate(context.Background(), b, l)
 			if err != nil {
 				t.Fatalf("%s group %d: buildLate: %v", pf, g, err)
 			}
@@ -69,6 +71,108 @@ func TestBuildLateFillsTheFlow(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The group search for a late frame's TxID stops once ctx is done: at a shard
+// width where a hit takes about 2^30 builds, a canceled run must not spin.
+func TestBuildLateStopsOnCancel(t *testing.T) {
+	t.Parallel()
+	cfg := Config{Mode: ModeUnicast, FrameVersion: 2, PayloadSize: 128, ShardBits: 30}
+	r := New(cfg, subtree.New(1, []byte("cancel")),
+		seq.New(seq.Config{Start: 1, GapEvery: 1, GapSize: 1, GapDelay: time.Millisecond}))
+	b := r.newLateBuilder([32]byte{1})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	// No 128-byte tx in a 2^30 search space lands in group 2^30-1 within 256
+	// builds with any real chance, so only the ctx check can end this early.
+	_, err := r.buildLate(ctx, b, seq.Late{Flow: seq.FlowKey{GroupIdx: 1<<30 - 1}, Seq: 2})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("buildLate on a canceled ctx: err %v, want context.Canceled", err)
+	}
+	if el := time.Since(start); el > 5*time.Second {
+		t.Errorf("buildLate took %v to notice the canceled ctx", el)
+	}
+}
+
+// A late sender that cannot open its socket fails the run up front, rather
+// than the run completing with every delayed gap left open.
+func TestRunFailsWhenTheLateSenderCannotStart(t *testing.T) {
+	t.Parallel()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close() // nothing listens there now: every dial is refused
+	cfg := Config{
+		Mode: ModeUnicast, Addr: addr, TCP: true, FrameVersion: 2, Workers: 1,
+		Duration: 200 * time.Millisecond, PayloadSize: 256, ShardBits: 2,
+	}
+	r := New(cfg, subtree.New(4, []byte("late-dial")),
+		seq.New(seq.Config{Start: 1, GapEvery: 5, GapSize: 1, GapDelay: 50 * time.Millisecond}))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	sent, err := r.Run(ctx)
+	if err == nil || !strings.Contains(err.Error(), "late sender") {
+		t.Fatalf("Run: sent %d, err %v; want a late sender error", sent, err)
+	}
+	if sent != 0 {
+		t.Errorf("sent %d frames before failing", sent)
+	}
+}
+
+// When the late sender falls behind, the stream waits for it: the queue of
+// skipped numbers stays within MaxPending plus one gap per worker, and every
+// accepted gap is still filled.
+func TestRunThrottlesOnTheFillBacklog(t *testing.T) {
+	t.Parallel()
+	const (
+		count      = 200
+		workers    = 2
+		maxPending = 4
+	)
+	sink := newUDPSink(t)
+	cfg := Config{
+		Mode: ModeUnicast, Addr: sink.addr, FrameVersion: 2, Workers: workers,
+		PPS: 0, Count: count, PayloadSize: 256, ShardBits: 2,
+	}
+	r := New(cfg, subtree.New(2, []byte("backlog")), seq.New(seq.Config{
+		Start: 1, GapEvery: 1, GapSize: 1, GapDelay: 20 * time.Millisecond, MaxPending: maxPending,
+	}))
+
+	var peak int
+	stop := make(chan struct{})
+	sampled := make(chan struct{})
+	go func() {
+		defer close(sampled)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			peak = max(peak, r.pfa.Pending())
+			time.Sleep(100 * time.Microsecond)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	sent, err := r.Run(ctx)
+	close(stop)
+	<-sampled
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if limit := maxPending + workers; peak > limit {
+		t.Errorf("queue peaked at %d gaps, want at most %d (MaxPending + one per worker)", peak, limit)
+	}
+	frames := sink.wait(t, int(sent), 5*time.Second)
+	if uint64(len(frames)) != sent || sent != count+r.Late() || r.Late() != count {
+		t.Errorf("sent %d, late %d, sink %d: want %d regular frames and one fill each",
+			sent, r.Late(), len(frames), count)
+	}
+	checkGapFills(t, frames, 2, 1, 1, 0, 256, false)
 }
 
 // Runner.Late counts the gap fills among the frames sent, and they are the

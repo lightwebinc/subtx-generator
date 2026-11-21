@@ -54,8 +54,10 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
 # Late gap fill: the listener sees a gap and NACKs it, and 500 ms after the
 # gap opened the generator sends the missing seq in a late frame of the same
-# flow, so bsl_gaps_suppressed_total rises. The run ends up to 500 ms after
-# -duration, once the last fills are out; the done line reports them as late=.
+# flow, so bsl_gaps_suppressed_total rises. After -duration the run keeps
+# going until every queued fill is out (the last comes due up to 500 ms
+# later, and building and sending can take longer); the done line reports
+# the fills as late=.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 500ms
 ```
 

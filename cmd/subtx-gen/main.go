@@ -52,7 +52,7 @@ func main() {
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
 		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames of each (group, subtree) flow (0 = disabled); needs -frame-version 2")
 		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap (at least 1)")
-		seqGapDelay           = flag.Duration("seq-gap-delay", 0, "send the skipped seq numbers this long after the gap, as late frames of the same flow (0 = permanent gap); the run waits up to this long after its last frame for the last fills")
+		seqGapDelay           = flag.Duration("seq-gap-delay", 0, "send the skipped seq numbers this long after the gap, as late frames of the same flow (0 = permanent gap); after the last regular frame the run keeps going until every queued fill is sent")
 		logInterval           = flag.Duration("log-interval", time.Second, "periodic stats interval")
 		printSubtrees         = flag.Bool("print-subtrees", false, "print all generated subtree IDs and exit")
 		subtreeGroup          = flag.String("subtree-group", "", "comma-separated 32-char hex GroupIDs to announce (BRC-127)")

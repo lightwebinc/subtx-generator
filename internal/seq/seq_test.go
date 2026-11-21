@@ -1,6 +1,8 @@
 package seq
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -122,6 +124,45 @@ func TestPerFlowPermanentGapQueuesNothing(t *testing.T) {
 	}
 	if due := p.DueRetransmits(time.Now().Add(time.Hour)); len(due) != 0 {
 		t.Errorf("DueRetransmits = %v, want none", due)
+	}
+}
+
+// Throttle holds producers while more than MaxPending skipped numbers wait,
+// releases them as DueRetransmits drains the queue, and gives up when ctx is
+// done. Nothing queued is dropped.
+func TestPerFlowThrottleWaitsForTheDrain(t *testing.T) {
+	p := NewPerFlow(Config{Start: 1, GapEvery: 1, GapSize: 2, GapDelay: time.Hour, MaxPending: 4})
+	k := FlowKey{GroupIdx: 3}
+	if err := p.Throttle(context.Background()); err != nil {
+		t.Fatalf("Throttle on an empty queue: %v", err)
+	}
+	for i := 0; i < 3; i++ { // 3 gaps x 2 numbers = 6 pending > 4
+		p.Next(k)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := p.Throttle(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Throttle over the bound: %v, want it to block until ctx is done", err)
+	}
+
+	released := make(chan error, 1)
+	go func() { released <- p.Throttle(context.Background()) }()
+	select {
+	case err := <-released:
+		t.Fatalf("Throttle returned %v before the queue drained", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if due := p.DueRetransmits(time.Now().Add(2 * time.Hour)); len(due) != 6 {
+		t.Fatalf("drained %d numbers, want all 6 queued", len(due))
+	}
+	select {
+	case err := <-released:
+		if err != nil {
+			t.Fatalf("Throttle after the drain: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Throttle still blocked after the queue drained")
 	}
 }
 

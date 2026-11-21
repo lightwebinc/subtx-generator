@@ -192,8 +192,10 @@ func (r *Runner) groupIdx(txid [32]byte) uint32 {
 }
 
 // Run blocks until ctx is canceled, Count is reached, or Duration elapses.
-// With delayed gaps (seq.Config.GapDelay) it then keeps sending the late gap
-// fills still queued, up to GapDelay longer, unless ctx is canceled.
+// With delayed gaps (seq.Config.GapDelay) it then keeps going until every
+// queued late gap fill is sent, unless ctx is canceled: the last fill comes
+// due up to GapDelay after the last regular frame, and building and sending
+// the fills can take longer than that.
 // Returns the number of frames transmitted, late gap fills included.
 func (r *Runner) Run(ctx context.Context) (uint64, error) {
 	// Exact-size payload contract: below the format minimum no valid tx of
@@ -207,6 +209,24 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 	// would vanish at encode time and the run would look like a clean one.
 	if r.pfa != nil && r.pfa.GapEnabled() && r.cfg.FrameVersion == myframe.V1 {
 		return 0, errors.New("gap injection needs frame version 2: a version 1 header carries no SeqNum")
+	}
+
+	// The late sender's socket and PRNG are set up before any frame goes
+	// out: a late sender that cannot start fails the run, instead of the
+	// run completing with every delayed gap left open.
+	var lateEm *emitter
+	var lateB *lateBuilder
+	if r.pfa != nil && r.pfa.Delayed() {
+		em, err := r.openEmitter()
+		if err != nil {
+			return 0, fmt.Errorf("late sender: %w", err)
+		}
+		var seed [32]byte
+		if _, err := cryptorand.Read(seed[:]); err != nil {
+			em.close()
+			return 0, fmt.Errorf("late sender: seed: %w", err)
+		}
+		lateEm, lateB = em, r.newLateBuilder(seed)
 	}
 
 	// Derive a run deadline if Duration is set.
@@ -263,11 +283,12 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 	// opened by the last frames are filled too; only ctx stops it early.
 	streamDone := make(chan struct{})
 	var lateWG sync.WaitGroup
-	if r.pfa != nil && r.pfa.Delayed() {
+	if lateEm != nil {
 		lateWG.Add(1)
 		go func() {
 			defer lateWG.Done()
-			r.sendLate(ctx, streamDone)
+			defer lateEm.close()
+			r.sendLate(ctx, lateEm, lateB, streamDone)
 		}()
 	}
 
@@ -294,6 +315,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	defer em.close() // drains any buffered TCP tail (ctx cancel, count reached, error)
 
 	srcIPv6 := r.bindSource16()
+	delayed := r.pfa != nil && r.pfa.Delayed()
 
 	// Per-worker PRNG seed.
 	var seed [32]byte
@@ -396,6 +418,15 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		// Either way r.pfa (built in New) is the per-flow allocator.
 		groupIdx := r.groupIdx(f.TxID)
 		if r.pfa != nil {
+			// With delayed gaps, wait while the late sender is MaxPending
+			// fills behind, before taking a SeqNum: the stream slows to what
+			// the fills can keep up with, and stopping here (ctx done)
+			// leaves no allocated number unsent.
+			if delayed {
+				if err := r.pfa.Throttle(ctx); err != nil {
+					return
+				}
+			}
 			f.SeqNum = r.pfa.Next(seq.FlowKey{GroupIdx: groupIdx, SubtreeID: f.SubtreeID})
 		} else {
 			_ = r.alloc.Next()
@@ -570,8 +601,9 @@ func (r *Runner) newLateBuilder(seed [32]byte) *lateBuilder {
 // l.Seq, so it joins the same flow at the listener (the same HashKey, from
 // the proxy or, in direct-multicast mode, from the generator) as the frames
 // around the gap. Late frames are never TxID-corrupted: a flipped bit could
-// move the TxID to another group, and so the frame to another flow.
-func (r *Runner) buildLate(b *lateBuilder, l seq.Late) (int, error) {
+// move the TxID to another group, and so the frame to another flow. The
+// group search stops with ctx's error once ctx is done.
+func (r *Runner) buildLate(ctx context.Context, b *lateBuilder, l seq.Late) (int, error) {
 	useEF := false
 	switch r.cfg.PayloadFormat {
 	case PayloadBRC128:
@@ -584,6 +616,9 @@ func (r *Runner) buildLate(b *lateBuilder, l seq.Late) (int, error) {
 	for i := 0; ; i++ {
 		if i == maxGroupSearch {
 			return 0, fmt.Errorf("no transaction in group %d after %d builds", l.Flow.GroupIdx, maxGroupSearch)
+		}
+		if i%256 == 255 && ctx.Err() != nil {
+			return 0, ctx.Err()
 		}
 		var err error
 		if useEF {
@@ -612,34 +647,22 @@ func (r *Runner) buildLate(b *lateBuilder, l seq.Late) (int, error) {
 	return myframe.Encode(r.cfg.FrameVersion, f, b.buf)
 }
 
-// sendLate sends a frame for each delayed gap as its GapDelay elapses, on an
-// emitter of its own, until the regular stream has ended (streamDone) and no
-// gap is left queued, or ctx is canceled.
-func (r *Runner) sendLate(ctx context.Context, streamDone <-chan struct{}) {
-	em, err := r.openEmitter()
-	if err != nil {
-		infof("late sender: %v", err)
-		return
-	}
-	defer em.close()
-
-	var seed [32]byte
-	if _, err := cryptorand.Read(seed[:]); err != nil {
-		infof("late sender: seed: %v", err)
-		return
-	}
-	b := r.newLateBuilder(seed)
-
+// sendLate sends a frame for each delayed gap as its GapDelay elapses, on its
+// own emitter, until the regular stream has ended (streamDone) and no gap is
+// left queued, or ctx is canceled: ctx is checked before every fill, so a
+// canceled run stops mid-batch.
+func (r *Runner) sendLate(ctx context.Context, em *emitter, b *lateBuilder, streamDone <-chan struct{}) {
 	var timer *time.Timer
 	done := streamDone
 	for {
-		if due := r.pfa.DueRetransmits(time.Now()); len(due) > 0 {
-			for _, l := range due {
-				r.sendOneLate(em, b, l)
+		for _, l := range r.pfa.DueRetransmits(time.Now()) {
+			if ctx.Err() != nil {
+				return
 			}
-			if err := em.flush(); err != nil {
-				r.errors.Add(1)
-			}
+			r.sendOneLate(ctx, em, b, l)
+		}
+		if ctx.Err() != nil {
+			return
 		}
 
 		at, ok := r.pfa.NextDue()
@@ -674,10 +697,15 @@ func (r *Runner) sendLate(ctx context.Context, streamDone <-chan struct{}) {
 	}
 }
 
-// sendOneLate builds and writes the frame that fills l.
-func (r *Runner) sendOneLate(em *emitter, b *lateBuilder, l seq.Late) {
-	n, err := r.buildLate(b, l)
+// sendOneLate builds and sends the frame that fills l. The frame counts as
+// sent once it has left the buffer: a datagram once written, a TCP frame once
+// flushed (fills are sparse, so each gets its own flush).
+func (r *Runner) sendOneLate(ctx context.Context, em *emitter, b *lateBuilder, l seq.Late) {
+	n, err := r.buildLate(ctx, b, l)
 	if err != nil {
+		if ctx.Err() != nil {
+			return // canceled mid-search: the run is stopping, not failing
+		}
 		r.errors.Add(1)
 		if !b.warned {
 			infof("late sender: seq %d of group %d: %v", l.Seq, l.Flow.GroupIdx, err)
@@ -686,6 +714,10 @@ func (r *Runner) sendOneLate(em *emitter, b *lateBuilder, l seq.Late) {
 		return
 	}
 	if err := em.write(b.buf[:n], l.Flow.GroupIdx); err != nil {
+		r.errors.Add(1)
+		return
+	}
+	if err := em.flush(); err != nil {
 		r.errors.Add(1)
 		return
 	}

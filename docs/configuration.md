@@ -101,9 +101,17 @@ How late gap fills are sent:
   regular frames only. The late frames go out on a socket of their own (a
   second TCP connection with `-tcp`), and the closing `done:` line reports them
   as `late=`, included in `sent=`.
-- When the regular stream ends (`-count` reached or `-duration` elapsed), the
-  run waits up to D for the fills still queued. SIGINT or SIGTERM stops it at
-  once, leaving those gaps unfilled.
+- D sets when each fill comes due, not when the run ends. When the regular
+  stream ends (`-count` reached or `-duration` elapsed), the run keeps going
+  until every queued fill is sent: the last comes due up to D after the last
+  regular frame, and building and sending the fills can take longer. SIGINT
+  or SIGTERM stops it at once, leaving those gaps unfilled.
+- Once 262144 skipped numbers wait for a late send (the fills have fallen that
+  far behind, for example at a high `-shard-bits`, where each fill costs about
+  2^`-shard-bits` builds), the regular stream waits for them, so memory stays
+  bounded and no gap is dropped.
+- A run with `-seq-gap-delay` fails at startup if the late frames' socket
+  cannot be opened.
 
 Permanent gap:
 ```

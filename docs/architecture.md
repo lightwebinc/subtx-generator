@@ -142,10 +142,18 @@ copy of the skipped frame before the fill passes it, so earlier NACKs for it fin
 retransmit.
 
 Late fills ride outside the pacer and do not count against `-count`; the run's `done:` line
-reports them as `late=`. When the regular stream ends, the late sender keeps going until the
-queue is empty, so a run can last up to D longer; canceling it (SIGINT, SIGTERM) stops the
-late sender at once. If D is zero (the default), the gap is permanent and ultimately
-increments `bsl_gaps_unrecovered_total` on the listener.
+reports them as `late=` (a TCP fill counts once flushed). D sets when each fill comes due,
+not when the run ends: when the regular stream ends, the late sender keeps going until the
+queue is empty, so the run lasts until the last fill (due up to D after the last regular
+frame) is built and sent. Canceling the run (SIGINT, SIGTERM) stops the late sender before
+its next fill and interrupts a TxID search. The late sender's socket is opened before the
+first frame goes out, so a late sender that cannot start fails the run.
+
+The queue is bounded: each worker calls `PerFlowAllocator.Throttle` before taking a SeqNum,
+which waits while more than `seq.DefaultMaxPending` (262144) skipped numbers are queued. A
+late sender that falls behind therefore slows the regular stream instead of growing the
+queue, and no accepted gap is dropped. If D is zero (the default), the gap is permanent and
+ultimately increments `bsl_gaps_unrecovered_total` on the listener.
 
 Gap injection needs `-frame-version 2`; a version 1 header has no SeqNum, so the generator
 refuses the combination at startup (as it does a zero `-seq-gap-size`, and a `-seq-gap-delay`

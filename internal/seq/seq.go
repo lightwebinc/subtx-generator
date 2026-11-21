@@ -14,19 +14,25 @@
 package seq
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// DefaultMaxPending is the default bound on skipped numbers a
+// [PerFlowAllocator] holds for late sends (see [PerFlowAllocator.Throttle]).
+const DefaultMaxPending = 1 << 18
 
 // Allocator hands out monotonically-increasing sequence numbers, optionally
 // with injected gaps.
 type Allocator struct {
 	next atomic.Uint64
 
-	gapEvery uint64
-	gapSize  uint64
-	gapDelay time.Duration
+	gapEvery   uint64
+	gapSize    uint64
+	gapDelay   time.Duration
+	maxPending uint64
 
 	counter atomic.Uint64 // alloc count, drives gapEvery pacing
 
@@ -45,14 +51,18 @@ type Config struct {
 	GapEvery uint64        // 0 = disabled
 	GapSize  uint64        // skip this many seq numbers per gap
 	GapDelay time.Duration // 0 = permanent gap; otherwise retransmit after delay
+	// MaxPending bounds the skipped numbers a PerFlowAllocator queues for
+	// late sends before Throttle makes producers wait; 0 = DefaultMaxPending.
+	MaxPending uint64
 }
 
 // New returns a new Allocator.
 func New(cfg Config) *Allocator {
 	a := &Allocator{
-		gapEvery: cfg.GapEvery,
-		gapSize:  cfg.GapSize,
-		gapDelay: cfg.GapDelay,
+		gapEvery:   cfg.GapEvery,
+		gapSize:    cfg.GapSize,
+		gapDelay:   cfg.GapDelay,
+		maxPending: cfg.MaxPending,
 	}
 	start := cfg.Start
 	if start == 0 {
@@ -134,7 +144,7 @@ func (a *Allocator) GapEnabled() bool {
 // constructing a [PerFlowAllocator] that mirrors a global [Allocator]'s
 // pattern on a per-flow basis.
 func (a *Allocator) GapConfig() Config {
-	return Config{GapEvery: a.gapEvery, GapSize: a.gapSize, GapDelay: a.gapDelay}
+	return Config{GapEvery: a.gapEvery, GapSize: a.gapSize, GapDelay: a.gapDelay, MaxPending: a.maxPending}
 }
 
 // Pending returns the number of gap groups still awaiting retransmission.
@@ -162,12 +172,16 @@ type FlowKey struct {
 // numbers every flow skips go on one queue, in due order, for
 // [PerFlowAllocator.DueRetransmits].
 type PerFlowAllocator struct {
-	cfg Config
+	cfg        Config
+	maxPending int64 // Throttle bound on pending (cfg.MaxPending or DefaultMaxPending)
 
-	mu     sync.Mutex
-	allocs map[FlowKey]*Allocator
-	late   []flowGap     // delayed gaps, oldest (and so soonest due) first
-	queued chan struct{} // signaled, never blocking, each time a gap is queued
+	mu      sync.Mutex
+	allocs  map[FlowKey]*Allocator
+	late    []flowGap     // delayed gaps, oldest (and so soonest due) first
+	queued  chan struct{} // signaled, never blocking, each time a gap is queued
+	drained chan struct{} // closed, then replaced, each time DueRetransmits pops
+
+	pending atomic.Int64 // skipped numbers in late, read lock-free by Throttle
 }
 
 // flowGap is one flow's skipped numbers, waiting for GapDelay to elapse.
@@ -186,10 +200,16 @@ type Late struct {
 
 // NewPerFlow returns a new PerFlowAllocator using cfg for every flow.
 func NewPerFlow(cfg Config) *PerFlowAllocator {
+	maxPending := int64(DefaultMaxPending)
+	if cfg.MaxPending > 0 && cfg.MaxPending < 1<<62 {
+		maxPending = int64(cfg.MaxPending)
+	}
 	return &PerFlowAllocator{
-		cfg:    cfg,
-		allocs: make(map[FlowKey]*Allocator),
-		queued: make(chan struct{}, 1),
+		cfg:        cfg,
+		maxPending: maxPending,
+		allocs:     make(map[FlowKey]*Allocator),
+		queued:     make(chan struct{}, 1),
+		drained:    make(chan struct{}),
 	}
 }
 
@@ -210,6 +230,7 @@ func (p *PerFlowAllocator) Next(k FlowKey) uint64 {
 		// Stamped under the lock so the queue stays in due order: every gap
 		// waits the same GapDelay.
 		p.late = append(p.late, flowGap{flow: k, seqs: gap, dueAt: time.Now().Add(p.cfg.GapDelay)})
+		p.pending.Add(int64(len(gap)))
 		p.mu.Unlock()
 		select {
 		case p.queued <- struct{}{}:
@@ -217,6 +238,31 @@ func (p *PerFlowAllocator) Next(k FlowKey) uint64 {
 		}
 	}
 	return s
+}
+
+// Throttle returns once at most MaxPending skipped numbers wait for a late
+// send, blocking until DueRetransmits drains the queue below that, or until
+// ctx is done (then it returns ctx's error). A producer that calls it before
+// each Next keeps the queue bounded: when late sends fall behind, the stream
+// waits for them instead of the queue growing without limit, and no gap is
+// dropped. Each producer can overshoot the bound by at most one gap.
+func (p *PerFlowAllocator) Throttle(ctx context.Context) error {
+	for p.pending.Load() > p.maxPending {
+		p.mu.Lock()
+		drained := p.drained
+		p.mu.Unlock()
+		// Re-check after taking the channel: a pop between the first load
+		// and the lock replaced it, and the next pop may never come.
+		if p.pending.Load() <= p.maxPending {
+			return nil
+		}
+		select {
+		case <-drained:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
 }
 
 // GapEnabled reports whether gap injection is active for this allocator.
@@ -253,6 +299,9 @@ func (p *PerFlowAllocator) DueRetransmits(now time.Time) []Late {
 	// array stays within a small factor of the queue length.
 	clear(p.late[:n])
 	p.late = p.late[n:]
+	p.pending.Add(-int64(len(due)))
+	close(p.drained) // wake producers waiting in Throttle
+	p.drained = make(chan struct{})
 	return due
 }
 
