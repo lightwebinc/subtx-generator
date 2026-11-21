@@ -83,8 +83,9 @@ subtx-generator/
 `net.UDPConn` and a seeded PRNG, eliminating lock contention on the hot path.
 
 **Sequence allocation:** a shared `seq.Allocator` counts frames across workers with an
-atomic counter. With gap injection, a `seq.PerFlowAllocator` built from the same settings
-stamps each frame's SeqNum per `(groupIdx, subtreeID)` flow, as the proxy would.
+atomic counter. With gap injection, a `seq.PerFlowAllocator` built from the same gap
+settings stamps each frame's SeqNum per `(groupIdx, subtreeID)` flow, as the proxy would;
+every flow starts at 1, whatever `-seq-start` says.
 
 **Subtree assignment:** the subtree ID pool is pre-computed from the user seed as
 `pool[i] = SHA256(seed ∥ uint64_be(i))`. Each frame's SubtreeID is selected deterministically:

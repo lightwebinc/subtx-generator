@@ -47,7 +47,7 @@ The generator stamps the SeqNums itself, so the proxy it sends to must run
 with `-allow-stamped-ingress` (see [configuration.md](configuration.md#gap-injection)).
 
 ```bash
-# Permanent gap: every 500th seq number of each flow is skipped; the listener reports
+# Permanent gap: each flow skips a sequence number every 500 frames; the listener reports
 # bsl_gaps_detected_total and (after NACK retries exhausted) bsl_gaps_unrecovered_total.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
