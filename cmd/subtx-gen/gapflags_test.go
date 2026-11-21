@@ -6,6 +6,7 @@ import (
 	"time"
 
 	myframe "github.com/lightwebinc/subtx-generator/internal/frame"
+	"github.com/lightwebinc/subtx-generator/internal/seq"
 )
 
 func TestCheckGapFlags(t *testing.T) {
@@ -26,6 +27,9 @@ func TestCheckGapFlags(t *testing.T) {
 		{"size zero", myframe.V2, 50, 0, 0, "-seq-gap-size"},
 		{"delay without gaps", myframe.V2, 0, 1, time.Second, "-seq-gap-every"},
 		{"negative delay", myframe.V2, 50, 1, -time.Second, "negative"},
+		{"delayed gap at the queue bound", myframe.V2, 50, seq.DefaultMaxPending, time.Second, ""},
+		{"delayed gap over the queue bound", myframe.V2, 50, seq.DefaultMaxPending + 1, time.Second, "-seq-gap-size"},
+		{"permanent gap over the queue bound", myframe.V2, 50, seq.DefaultMaxPending + 1, 0, ""},
 	} {
 		err := checkGapFlags(tc.fv, tc.every, tc.size, tc.delay)
 		switch {

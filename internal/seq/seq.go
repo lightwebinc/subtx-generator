@@ -15,6 +15,7 @@ package seq
 
 import (
 	"context"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -201,8 +202,8 @@ type Late struct {
 // NewPerFlow returns a new PerFlowAllocator using cfg for every flow.
 func NewPerFlow(cfg Config) *PerFlowAllocator {
 	maxPending := int64(DefaultMaxPending)
-	if cfg.MaxPending > 0 && cfg.MaxPending < 1<<62 {
-		maxPending = int64(cfg.MaxPending)
+	if cfg.MaxPending > 0 {
+		maxPending = int64(min(cfg.MaxPending, math.MaxInt64))
 	}
 	return &PerFlowAllocator{
 		cfg:        cfg,

@@ -156,8 +156,8 @@ queue, and no accepted gap is dropped. If D is zero (the default), the gap is pe
 ultimately increments `bsl_gaps_unrecovered_total` on the listener.
 
 Gap injection needs `-frame-version 2`; a version 1 header has no SeqNum, so the generator
-refuses the combination at startup (as it does a zero `-seq-gap-size`, and a `-seq-gap-delay`
-without `-seq-gap-every`).
+refuses the combination at startup (as it does a zero `-seq-gap-size`, a `-seq-gap-delay`
+without `-seq-gap-every`, and a delayed gap larger than the queue bound).
 
 ## BRC-127 SubtreeGroupAnnounce (announce mode)
 

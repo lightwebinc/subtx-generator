@@ -30,7 +30,7 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 | `-payload-format` | `brc128` | Payload encoding: `brc128` (BRC-30 EF; the default, because the fabric is EF-native), `brc124` (raw tx; legacy/miner lanes), or `mixed`. The frame TxID is stamped canonically (`objfmt.TxID`, i.e. over the standard serialization with the EF extras excluded) |
 | `-seq-start` | `1` | First sequence number |
 | `-seq-gap-every` | `0` | Inject a gap every N frames of each `(group, subtree)` flow; 0 = disabled. Needs `-frame-version 2` |
-| `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap (at least 1 with `-seq-gap-every`) |
+| `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap (at least 1 with `-seq-gap-every`; at most 262144 with `-seq-gap-delay`) |
 | `-seq-gap-delay` | `0` | Send each skipped sequence number this long after its gap opened, in a late frame of the same flow; 0 = permanent gap. Needs `-seq-gap-every`; negative is an error |
 | `-log-interval` | `1s` | Periodic statistics log interval |
 | `-print-subtrees` | `false` | Print all subtree IDs in the pool and exit |
@@ -79,7 +79,8 @@ match the proxy's, since it decides which flow each frame belongs to.
 - **`-seq-gap-every N`**: each flow skips `seq-gap-size` sequence numbers every N
   of its frames. Setting N=500 creates one gap per 500 frames of each flow.
 - **`-seq-gap-size S`**: how many consecutive sequence numbers to skip per gap event.
-  The listener opens S individual gap entries. Must be at least 1.
+  The listener opens S individual gap entries. Must be at least 1, and at most
+  262144 with `-seq-gap-delay` (the late-fill queue bound).
 - **`-seq-gap-delay D`**: if non-zero, the generator sends each skipped sequence
   number D after its gap opened, in a late frame of the same flow. A value of `0`
   (the default) creates a permanent gap that exhausts all NACK retries and

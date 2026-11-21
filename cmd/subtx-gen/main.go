@@ -51,7 +51,7 @@ func main() {
 		payloadFormat         = flag.String("payload-format", "brc128", "payload encoding: brc128 (BRC-30 EF; default, the fabric is EF-native), brc124 (raw tx; legacy/miner lanes), or mixed")
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
 		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames of each (group, subtree) flow (0 = disabled); needs -frame-version 2")
-		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap (at least 1)")
+		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap (at least 1; at most 262144 with -seq-gap-delay)")
 		seqGapDelay           = flag.Duration("seq-gap-delay", 0, "send the skipped seq numbers this long after the gap, as late frames of the same flow (0 = permanent gap); after the last regular frame the run keeps going until every queued fill is sent")
 		logInterval           = flag.Duration("log-interval", time.Second, "periodic stats interval")
 		printSubtrees         = flag.Bool("print-subtrees", false, "print all generated subtree IDs and exit")
@@ -268,7 +268,8 @@ func main() {
 // checkGapFlags refuses gap-injection settings that would silently do
 // nothing: a v1 (BRC-12) header has no SeqNum to carry a gap, a zero
 // -seq-gap-size skips nothing, and a -seq-gap-delay without -seq-gap-every
-// has no gap to fill.
+// has no gap to fill. It also refuses a delayed gap larger than the late-fill
+// queue bound, which one gap would hold in memory all at once.
 func checkGapFlags(fv myframe.Version, every, size uint64, delay time.Duration) error {
 	switch {
 	case delay < 0:
@@ -279,6 +280,8 @@ func checkGapFlags(fv myframe.Version, every, size uint64, delay time.Duration) 
 		return errors.New("-seq-gap-every needs a -seq-gap-size of at least 1")
 	case every > 0 && fv == myframe.V1:
 		return errors.New("-seq-gap-every needs -frame-version 2: a version 1 (BRC-12) header carries no SeqNum, so no gap would reach the wire")
+	case every > 0 && delay > 0 && size > seq.DefaultMaxPending:
+		return fmt.Errorf("-seq-gap-size %d exceeds %d, the most skipped numbers -seq-gap-delay queues for late sends", size, seq.DefaultMaxPending)
 	}
 	return nil
 }
