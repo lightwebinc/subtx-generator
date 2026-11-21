@@ -24,7 +24,7 @@
 //
 // Usage:
 //
-//	tunnel-sink -listen '[fd00:1b5e::1]:8833'
+//	tunnel-sink -listen '[2001:db8::1]:8833'
 //	tunnel-sink -listen :8833 -submit-edge edge.example.net
 package main
 
