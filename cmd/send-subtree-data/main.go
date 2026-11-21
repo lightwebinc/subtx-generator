@@ -10,7 +10,7 @@
 //
 // Usage:
 //
-//	send-subtree-data -addr [fd20::2]:9002 -frames 20 -msg-type hashes
+//	send-subtree-data -addr [2001:db8::2]:9002 -frames 20 -msg-type hashes
 package main
 
 import (

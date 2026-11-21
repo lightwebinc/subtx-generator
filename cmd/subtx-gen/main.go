@@ -3,12 +3,13 @@
 //
 // See docs/configuration.md for the full flag set. Example:
 //
-//	subtx-gen -addr [fd20::2]:8725 -shard-bits 2 -subtrees 8 -pps 1000 -duration 10s
+//	subtx-gen -addr [2001:db8::2]:8725 -shard-bits 2 -subtrees 8 -pps 1000 -duration 10s
 package main
 
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -39,19 +40,19 @@ func main() {
 		addr                  = flag.String("addr", "[::1]:8725", "target host:port (UDP by default; TCP with -tcp)")
 		tcp                   = flag.Bool("tcp", false, "submit over TCP, the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. -mode unicast only.")
 		frameVer              = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
-		shardBits             = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
+		shardBits             = flag.Uint("shard-bits", 2, "shard-bits the proxy uses; with gap injection or -mode direct-multicast it keys the per-flow SeqNums (and each late gap fill's group), so it must match the proxy")
 		subtrees              = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
 		subtreeSeed           = flag.String("subtree-seed", "subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
 		pps                   = flag.Int("pps", 1000, "target packets per second (0 = unlimited)")
 		duration              = flag.Duration("duration", 0, "max runtime (0 = until -count reached or SIGINT; if >0, stops at min(count,duration))")
-		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
+		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited); late gap fills (-seq-gap-delay) are sent on top")
 		workers               = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
 		payloadSize           = flag.Int("payload-size", 512, "exact transaction payload size in bytes (each payload is one valid tx of exactly this size; min 75 for brc128/mixed, 60 for brc124)")
 		payloadFormat         = flag.String("payload-format", "brc128", "payload encoding: brc128 (BRC-30 EF; default, the fabric is EF-native), brc124 (raw tx; legacy/miner lanes), or mixed")
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
-		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
-		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
-		seqGapDelay           = flag.Duration("seq-gap-delay", 0, "delay before retransmitting the gap (0 = permanent gap)")
+		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames of each (group, subtree) flow (0 = disabled); needs -frame-version 2")
+		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap (at least 1)")
+		seqGapDelay           = flag.Duration("seq-gap-delay", 0, "send the skipped seq numbers this long after the gap, as late frames of the same flow (0 = permanent gap); the run waits up to this long after its last frame for the last fills")
 		logInterval           = flag.Duration("log-interval", time.Second, "periodic stats interval")
 		printSubtrees         = flag.Bool("print-subtrees", false, "print all generated subtree IDs and exit")
 		subtreeGroup          = flag.String("subtree-group", "", "comma-separated 32-char hex GroupIDs to announce (BRC-127)")
@@ -109,6 +110,9 @@ func main() {
 	default:
 		fatalf("frame-version must be 1 or 2, got %d", *frameVer)
 	}
+	if err := checkGapFlags(fv, *seqGapEvery, *seqGapSize, *seqGapDelay); err != nil {
+		fatalf("%v", err)
+	}
 
 	// Payload format (BRC-12 raw vs BRC-30 EF).
 	var pf sender.PayloadFormat
@@ -153,7 +157,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  subtree[0]=%s  subtree[n-1]=%s  shard-bits=%d\n",
 			pool.HexAt(0), pool.HexAt(pool.Len()-1), *shardBits)
 	}
-	_ = shardBits // reserved for future predicted-group logging
 
 	cfg := sender.Config{
 		Addr:            *addr,
@@ -258,8 +261,26 @@ func main() {
 	if err != nil {
 		fatalf("run: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "done: sent=%d errors=%d elapsed=%s avg_pps=%.0f\n",
-		sent, r.Errors(), elapsed, float64(sent)/elapsed.Seconds())
+	fmt.Fprintf(os.Stderr, "done: sent=%d late=%d errors=%d elapsed=%s avg_pps=%.0f\n",
+		sent, r.Late(), r.Errors(), elapsed, float64(sent)/elapsed.Seconds())
+}
+
+// checkGapFlags refuses gap-injection settings that would silently do
+// nothing: a v1 (BRC-12) header has no SeqNum to carry a gap, a zero
+// -seq-gap-size skips nothing, and a -seq-gap-delay without -seq-gap-every
+// has no gap to fill.
+func checkGapFlags(fv myframe.Version, every, size uint64, delay time.Duration) error {
+	switch {
+	case delay < 0:
+		return fmt.Errorf("-seq-gap-delay %v is negative", delay)
+	case every == 0 && delay > 0:
+		return errors.New("-seq-gap-delay needs -seq-gap-every: without a gap there is nothing to send late")
+	case every > 0 && size == 0:
+		return errors.New("-seq-gap-every needs a -seq-gap-size of at least 1")
+	case every > 0 && fv == myframe.V1:
+		return errors.New("-seq-gap-every needs -frame-version 2: a version 1 (BRC-12) header carries no SeqNum, so no gap would reach the wire")
+	}
+	return nil
 }
 
 // parseUint16 parses "0x000B" / "0B" / "11" forms into a uint16.

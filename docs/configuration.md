@@ -18,20 +18,20 @@ BRC-127 SubtreeGroupAnnounce datagrams via TCP.
 |---|---|---|
 | `-addr` | `[::1]:8725` | Target `host:port` (UDP by default; TCP with `-tcp`) |
 | `-tcp` | `false` | Submit over TCP, the standard 8725 submission lane (a stream of BRC frames, no envelope). UDP submission is deprecated. `-mode unicast` only |
-| `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header) |
-| `-shard-bits` | `2` | Informational: shard-bits the proxy uses (for predicted-group diagnostic logging) |
+| `-frame-version` | `2` | Frame version to emit: `1` (BRC-12, 44-byte header) or `2` (BRC-124/128, 92-byte header). Gap injection needs `2`: a v1 header has no SeqNum, so `-seq-gap-every` with `1` is a startup error |
+| `-shard-bits` | `2` | Shard bits the proxy uses. With gap injection or `-mode direct-multicast` it keys the per-flow SeqNums (and picks each late gap fill's group), so it must match the proxy's |
 | `-subtrees` | `8` | Number of deterministic subtree IDs in the pool (0 = no SubtreeID field set) |
 | `-subtree-seed` | `subtx-generator-default` | Seed for subtree ID pool derivation; plain string or hex |
 | `-pps` | `1000` | Target packets per second (0 = unlimited) |
 | `-duration` | `0` | Max run time. `0` (default) runs until `-count` is reached or SIGINT; if `>0`, stops at whichever of count or duration comes first |
-| `-count` | `0` | Stop after N frames (0 = unlimited) |
+| `-count` | `0` | Stop after N frames (0 = unlimited). Late gap fills (`-seq-gap-delay`) are sent on top of N |
 | `-workers` | `0` | Worker goroutine count; 0 = `runtime.NumCPU()` |
 | `-payload-size` | `512` | Exact transaction payload size in bytes. Every payload is exactly one structurally valid tx of this size (sizing slack is absorbed inside the script fields, never as trailing padding, which desyncs TCP objfmt streams). Minimum 75 for `brc128`/`mixed`, 60 for `brc124`; below-minimum sizes fail at startup |
 | `-payload-format` | `brc128` | Payload encoding: `brc128` (BRC-30 EF; the default, because the fabric is EF-native), `brc124` (raw tx; legacy/miner lanes), or `mixed`. The frame TxID is stamped canonically (`objfmt.TxID`, i.e. over the standard serialization with the EF extras excluded) |
 | `-seq-start` | `1` | First sequence number |
-| `-seq-gap-every` | `0` | Inject a gap every N frames; 0 = disabled |
-| `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap |
-| `-seq-gap-delay` | `0` | Delay before retransmitting the skipped sequence(s); 0 = permanent gap |
+| `-seq-gap-every` | `0` | Inject a gap every N frames of each `(group, subtree)` flow; 0 = disabled. Needs `-frame-version 2` |
+| `-seq-gap-size` | `1` | Number of sequence numbers to skip per gap (at least 1 with `-seq-gap-every`) |
+| `-seq-gap-delay` | `0` | Send each skipped sequence number this long after its gap opened, in a late frame of the same flow; 0 = permanent gap. Needs `-seq-gap-every`; negative is an error |
 | `-log-interval` | `1s` | Periodic statistics log interval |
 | `-print-subtrees` | `false` | Print all subtree IDs in the pool and exit |
 | `-subtree-group` | `""` | Comma-separated 32-char hex GroupIDs for BRC-127 announce (empty = disabled) |
@@ -68,31 +68,57 @@ data-plane publisher.
 ### Gap Injection
 
 Three flags control gap injection. It needs `-frame-version 2`: a version 1
-frame has no SeqNum, so the gaps would not reach the wire (the generator does
-not refuse the combination). The generator then stamps each frame's SeqNum
-itself, per `(group, subtree)` flow as the proxy would, starting every flow at
-1 whatever `-seq-start` says, so a proxy on the path must run with
-`-allow-stamped-ingress` (a default proxy drops stamped frames as
-`stamped_ingress`); `-mode direct-multicast` needs no proxy.
+frame has no SeqNum, so no gap would reach the wire, and the generator refuses
+`-seq-gap-every` with `-frame-version 1` at startup. The generator then stamps
+each frame's SeqNum itself, per `(group, subtree)` flow as the proxy would,
+starting every flow at 1 whatever `-seq-start` says, so a proxy on the path
+must run with `-allow-stamped-ingress` (a default proxy drops stamped frames as
+`stamped_ingress`); `-mode direct-multicast` needs no proxy. `-shard-bits` must
+match the proxy's, since it decides which flow each frame belongs to.
 
 - **`-seq-gap-every N`**: each flow skips `seq-gap-size` sequence numbers every N
   of its frames. Setting N=500 creates one gap per 500 frames of each flow.
 - **`-seq-gap-size S`**: how many consecutive sequence numbers to skip per gap event.
-  The listener opens S individual gap entries.
-- **`-seq-gap-delay D`**: if non-zero, the allocator resends the skipped sequence(s)
-  after duration D. A value of `0` (the default) creates a permanent gap that exhausts
-  all NACK retries and increments `bsl_gaps_unrecovered_total`. A value such as `50ms`
-  creates a delayed retransmit that should suppress the NACK via `bsl_gaps_suppressed_total`.
+  The listener opens S individual gap entries. Must be at least 1.
+- **`-seq-gap-delay D`**: if non-zero, the generator sends each skipped sequence
+  number D after its gap opened, in a late frame of the same flow. A value of `0`
+  (the default) creates a permanent gap that exhausts all NACK retries and
+  increments `bsl_gaps_unrecovered_total`. A value such as `500ms` fills the gap
+  late, and the listener counts the fill in `bsl_gaps_suppressed_total`. No
+  retry endpoint holds the skipped frame until its late fill has passed, so a
+  NACK sent before then finds no copy to retransmit. Without `-seq-gap-every`
+  it is a startup error.
+
+How late gap fills are sent:
+
+- Each late frame carries a fresh transaction of the configured
+  `-payload-format` and `-payload-size` whose TxID shards to the flow's group,
+  the flow's SubtreeID, and the skipped SeqNum, so it lands in the same flow at
+  the listener as the frames around the gap. Finding such a TxID takes about
+  2^`-shard-bits` payload builds per late frame. Late frames are never
+  TxID-corrupted (`-corrupt-txid-rate`).
+- They come on top of the regular stream: `-count` and `-pps` govern the
+  regular frames only. The late frames go out on a socket of their own (a
+  second TCP connection with `-tcp`), and the closing `done:` line reports them
+  as `late=`, included in `sent=`.
+- When the regular stream ends (`-count` reached or `-duration` elapsed), the
+  run waits up to D for the fills still queued. SIGINT or SIGTERM stops it at
+  once, leaving those gaps unfilled.
 
 Permanent gap:
 ```
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 ```
 
-Delayed retransmit (NACK recovery test):
+Late gap fill (NACK recovery test):
 ```
-subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
+subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 500ms
 ```
+
+The listener only sees a gap if the late frame arrives after the flow's next
+frame: pick D longer than the time between two frames of one flow (about
+`2^shard-bits × -subtrees / -pps`; 32 ms at the defaults), or the late frame
+arrives in order and no gap is seen.
 
 ---
 

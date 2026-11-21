@@ -8,7 +8,7 @@ Worked examples for each binary. Every flag is listed in
 
 ```bash
 subtx-gen \
-  -addr [fd20::2]:8725 \
+  -addr [2001:db8::2]:8725 \
   -frame-version 2 \
   -shard-bits 2 \
   -subtrees 8 \
@@ -29,7 +29,7 @@ subtx-gen \
 # list so receivers' (S,G) joins include this generator.
 subtx-gen \
   -mode direct-multicast \
-  -bind-source fd20::abc \
+  -bind-source 2001:db8::abc \
   -egress-iface eth0 \
   -source-mode ssm \
   -scope site \
@@ -44,17 +44,19 @@ for the full design.
 ## Gap injection (NACK / retransmit tests)
 
 The generator stamps the SeqNums itself, so the proxy it sends to must run
-with `-allow-stamped-ingress` (see [configuration.md](configuration.md#gap-injection)).
+with `-allow-stamped-ingress`, and gap injection needs `-frame-version 2` (see
+[configuration.md](configuration.md#gap-injection)).
 
 ```bash
 # Permanent gap: each flow skips a sequence number every 500 frames; the listener reports
 # bsl_gaps_detected_total and (after NACK retries exhausted) bsl_gaps_unrecovered_total.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
-# Delayed retransmit: the listener sees a gap, emits a NACK, and the
-# generator resends the missing seq 50 ms later so bsl_gaps_suppressed_total
-# (or forwarded-after-recovery) should rise.
-subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
+# Late gap fill: the listener sees a gap and NACKs it, and 500 ms after the
+# gap opened the generator sends the missing seq in a late frame of the same
+# flow, so bsl_gaps_suppressed_total rises. The run ends up to 500 ms after
+# -duration, once the last fills are out; the done line reports them as late=.
+subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 500ms
 ```
 
 ## BRC-127 SubtreeGroupAnnounce sender
@@ -63,11 +65,11 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 # Connect to the proxy TCP ingress and periodically announce all subtree IDs
 # in the pool to the GroupSubtreeGroupAnnounce control-plane multicast group.
 subtx-gen \
-  -addr [fd20::2]:8725 \
+  -addr [2001:db8::2]:8725 \
   -subtrees 8 \
   -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
-  -announce-addr [fd20::2]:9002 \
+  -announce-addr [2001:db8::2]:9002 \
   -announce-interval 10s \
   -announce-ttl 0 \
   -pps 1000 -duration 30s
@@ -86,11 +88,11 @@ scenario 21 in [multicast-test SCENARIOS.md](https://github.com/lightwebinc/mult
 # Announce 1 new subtree every 75s (8 subtrees → full coverage after ~10 min).
 # Re-announce every 12s to keep TTL=90s entries alive.
 subtx-gen \
-  -addr [fd20::2]:8725 \
+  -addr [2001:db8::2]:8725 \
   -subtrees 8 \
   -subtree-seed 'multicast-lab-bsv' \
   -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
-  -announce-addr [fd20::2]:9002 \
+  -announce-addr [2001:db8::2]:9002 \
   -announce-interval 12s \
   -announce-ttl 90 \
   -announce-phase-size 1 \
