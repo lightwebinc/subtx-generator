@@ -73,6 +73,7 @@ subtx-generator/
   internal/sender/         Worker pool: one net.UDPConn per worker goroutine
   internal/announce/       BRC-127 SubtreeGroupAnnounce TCP sender
   internal/blockhdr/       Synthetic PoW-valid 80-byte block-header builder
+  internal/merkle/         Subtree merkle root, computed as Teranode does
   scripts/exercise-lanes.sh  Drive tx + subtree + block lanes at one edge concurrently
 ```
 
@@ -81,8 +82,10 @@ subtx-generator/
 `subtx-gen` starts a pool of worker goroutines. Each worker owns an independent
 `net.UDPConn` and a seeded PRNG, eliminating lock contention on the hot path.
 
-**Sequence allocation:** a shared `seq.Allocator` distributes monotonically increasing
-sequence numbers across workers using an atomic counter. Each frame gets a unique SeqNum.
+**Sequence allocation:** a shared `seq.Allocator` counts frames across workers with an
+atomic counter. With gap injection, a `seq.PerFlowAllocator` built from the same gap
+settings stamps each frame's SeqNum per `(groupIdx, subtreeID)` flow, as the proxy would;
+every flow starts at 1, whatever `-seq-start` says.
 
 **Subtree assignment:** the subtree ID pool is pre-computed from the user seed as
 `pool[i] = SHA256(seed ∥ uint64_be(i))`. Each frame's SubtreeID is selected deterministically:
@@ -90,8 +93,8 @@ sequence numbers across workers using an atomic counter. Each frame gets a uniqu
 produces identical IDs across runs and machines.
 
 **HashKey and SeqNum** are emitted as zero by the generator in the
-default `unicast` mode. `shard-proxy` stamps them in-place before
-multicast forwarding.
+default `unicast` mode (gap injection stamps SeqNum). `shard-proxy`
+stamps them in-place before multicast forwarding.
 
 In `-mode=direct-multicast` (see
 [Source-Specific Multicast design](https://github.com/lightwebinc/bsv-multicast/blob/main/DESIGN.md#source-specific-multicast-ssm))
@@ -121,9 +124,10 @@ disables pacing.
 Gap injection exercises the NACK/retransmission path end-to-end without requiring any
 manual packet loss.
 
-When `-seq-gap-every N` is set, the `seq.Allocator` skips `seq-gap-size` sequence numbers
-every N allocated sequences. The resulting gap is immediately detectable by the listener
-(`bsl_gaps_detected_total` rises).
+When `-seq-gap-every N` is set, each `(groupIdx, subtreeID)` flow skips `seq-gap-size`
+sequence numbers every N of its frames. The resulting gap is immediately detectable by the
+listener (`bsl_gaps_detected_total` rises). A proxy on the path must run with
+`-allow-stamped-ingress`, or it drops the stamped frames.
 
 When `-seq-gap-delay D` is also set, the allocator enqueues the skipped sequence number(s)
 for retransmission after duration D. If the listener has already sent a NACK and the retry

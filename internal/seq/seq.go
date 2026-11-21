@@ -110,8 +110,9 @@ func (a *Allocator) DueRetransmits(now time.Time) []uint64 {
 
 // GapEnabled reports whether gap injection is active (GapEvery > 0 and GapSize > 0).
 // When true, callers should pre-stamp the frame's SeqNum with the value returned
-// by Next() so the proxy passes the frame through verbatim; the gaps in the
-// sequence are the desired missing frames at the listener.
+// by Next(); the gaps in the sequence are the desired missing frames at the
+// listener. A proxy on the path forwards stamped frames only with
+// -allow-stamped-ingress.
 func (a *Allocator) GapEnabled() bool {
 	return a.gapEvery != 0 && a.gapSize != 0
 }
