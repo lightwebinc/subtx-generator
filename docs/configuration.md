@@ -67,10 +67,13 @@ data-plane publisher.
 
 ### Gap Injection
 
-Three flags control gap injection:
+Three flags control gap injection. The generator then stamps each frame's
+SeqNum itself, per `(group, subtree)` flow as the proxy would, so a proxy on
+the path must run with `-allow-stamped-ingress` (a default proxy drops
+stamped frames as `stamped_ingress`); `-mode direct-multicast` needs no proxy.
 
-- **`-seq-gap-every N`**: the allocator skips `seq-gap-size` sequence numbers every N
-  allocated sequences. Setting N=500 creates one gap per 500 frames.
+- **`-seq-gap-every N`**: each flow skips `seq-gap-size` sequence numbers every N
+  of its frames. Setting N=500 creates one gap per 500 frames of each flow.
 - **`-seq-gap-size S`**: how many consecutive sequence numbers to skip per gap event.
   The listener opens S individual gap entries.
 - **`-seq-gap-delay D`**: if non-zero, the allocator resends the skipped sequence(s)

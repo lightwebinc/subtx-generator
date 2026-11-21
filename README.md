@@ -13,7 +13,8 @@ and [`shard-listener`](https://github.com/lightwebinc/shard-listener).
 Supports v1 (44-byte header) and BRC-124/v2 (92-byte header, with
 `HashKey`, `SeqNum`, `SubtreeID`) frame formats and is designed for
 multi-core line-rate emission. Note: `HashKey` and `SeqNum` are emitted
-as zero; the proxy stamps them in-place before multicast forwarding.
+as zero (gap injection stamps `SeqNum`, direct-multicast mode both); the
+proxy stamps them in-place before multicast forwarding.
 
 ## Features
 
@@ -85,6 +86,7 @@ internal/rate/            ticker-based pacer (smooth / burst)
 internal/sender/          worker pool driving net.UDPConn per worker
 internal/announce/        BRC-127 SubtreeGroupAnnounce TCP sender
 internal/blockhdr/        synthetic PoW-valid 80-byte block-header builder
+internal/merkle/          subtree merkle root, computed as Teranode does
 ```
 
 `send-block-announce` and `send-subtree-data` are legacy privileged senders; see
@@ -98,7 +100,7 @@ internal/blockhdr/        synthetic PoW-valid 80-byte block-header builder
 
 ## Container image
 
-Images are published per release tag as
+Release images are published by a manual workflow dispatch as
 `ghcr.io/lightwebinc/subtx-generator:<tag>`: one
 `gcr.io/distroless/static:nonroot` image with all seven binaries and no
 `ENTRYPOINT`, so the caller picks the binary. See
@@ -111,7 +113,7 @@ A Kubernetes Helm chart is published from a dedicated chart repository:
 - Repository: [`charts/subtx-generator`](https://github.com/lightwebinc/charts/tree/main/charts/subtx-generator)
 - Install: `helm install subtx-generator oci://ghcr.io/lightwebinc/charts/subtx-generator`
 
-The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (see the chart README for the mode list). Because these binaries accept **CLI flags only** (no env vars), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
+The chart packages a single multi-binary image and selects which binary to run via `.Values.mode` (see the chart README for the mode list). Because these binaries accept **CLI flags only** (apart from `LOG_FORMAT`), the chart renders the matching per-mode `args` block into the container's `command` + `args`. Both `Deployment` and `Job` workload types are supported. See the chart README for the full reference.
 
 ## Releases
 

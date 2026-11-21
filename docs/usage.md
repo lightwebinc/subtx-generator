@@ -43,8 +43,11 @@ for the full design.
 
 ## Gap injection (NACK / retransmit tests)
 
+The generator stamps the SeqNums itself, so the proxy it sends to must run
+with `-allow-stamped-ingress` (see [configuration.md](configuration.md#gap-injection)).
+
 ```bash
-# Permanent gap: every 500th seq number is skipped; the listener reports
+# Permanent gap: every 500th seq number of each flow is skipped; the listener reports
 # bsl_gaps_detected_total and (after NACK retries exhausted) bsl_gaps_unrecovered_total.
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 
@@ -116,7 +119,7 @@ subtree node count / block subtree count). On exit (Ctrl-C) it prints
 per-class session statistics.
 
 ```bash
-tunnel-sink -listen '[fd00:1b5e::1]:8833'
+tunnel-sink -listen '[2001:db8::1]:8833'
 
 # also log the SENT direction: relay local submissions to the edge's
 # ingress lanes (tx 8725 / subtree 8726 / block 8727) and log each object
@@ -161,9 +164,9 @@ The single `gcr.io/distroless/static:nonroot` image carries all seven binaries:
 /usr/local/bin/tunnel-sink           (consumer tunnel delivery sink + submit relay, diagnostic)
 ```
 
-Images are published per release tag as
+Release images are published by a manual workflow dispatch as
 `ghcr.io/lightwebinc/subtx-generator:<tag>`, the git tag without its `v`
-(for example `ghcr.io/lightwebinc/subtx-generator:0.4.0`).
+(for example `ghcr.io/lightwebinc/subtx-generator:0.4.4`).
 
 **No `ENTRYPOINT` is set**: the consumer (Helm chart `mode` selector,
 `docker run --entrypoint=…`, Kubernetes `command:` field) picks which binary
