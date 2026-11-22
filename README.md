@@ -102,7 +102,8 @@ internal/merkle/          subtree merkle root, computed as Teranode does
 
 Release images are published by a manual workflow dispatch as
 `ghcr.io/lightwebinc/subtx-generator:<tag>`: one
-`gcr.io/distroless/static:nonroot` image with all seven binaries and no
+`gcr.io/distroless/static:nonroot` image with all seven binaries, `LICENSE`,
+`NOTICE` and `LICENSE-THIRD-PARTY` in `/usr/share/doc/subtx-generator/`, and no
 `ENTRYPOINT`, so the caller picks the binary. See
 [docs/usage.md § Container image](docs/usage.md#container-image).
 
@@ -122,3 +123,4 @@ Releases and release notes live on [GitHub Releases](https://github.com/lightweb
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Third-party notices are in [NOTICE](NOTICE) and [LICENSE-THIRD-PARTY](LICENSE-THIRD-PARTY).

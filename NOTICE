@@ -28,7 +28,24 @@ This product includes third-party software, distributed under the terms
 of their respective licenses. Each dependency retains its own copyright;
 this notice does not modify those licenses.
 
-  github.com/lightwebinc/shard-common         Apache License 2.0
-  github.com/cespare/xxhash/v2                MIT License (transitive)
+  github.com/cespare/xxhash/v2                  MIT License
+  github.com/lightwebinc/shard-common           Apache License 2.0
+  golang.org/x/sys                              BSD License
+
+The list is every module this repository's packages link in a Linux or
+FreeBSD build (a FreeBSD build links a subset of the Linux one), so its
+code is inside any binary built here for either. Each module's full
+license text, and the NOTICE file a module ships (Apache-2.0 section
+4(d) asks that its attribution notices travel with the code), is
+reproduced verbatim in LICENSE-THIRD-PARTY. That file is GENERATED from
+what the packages link in a Linux build rather than maintained by hand,
+and CI fails when it is stale; if this list and that file ever differ,
+the file is the current one.
+
+Every one of those licenses requires its own text to reach whoever
+receives a binary, not only whoever receives source, and static linking
+discards the modules' own license files, so LICENSE-THIRD-PARTY and this
+NOTICE must travel with any binary built from this repository. The image
+carries both, with LICENSE, in /usr/share/doc/subtx-generator/.
 
 =========================================================================
