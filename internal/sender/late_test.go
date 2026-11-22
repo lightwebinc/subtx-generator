@@ -3,8 +3,10 @@ package sender
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -119,6 +121,84 @@ func TestRunFailsWhenTheLateSenderCannotStart(t *testing.T) {
 	}
 	if sent != 0 {
 		t.Errorf("sent %d frames before failing", sent)
+	}
+}
+
+// Canceling the run also frees a late write blocked on a peer that has
+// stopped reading: Run returns instead of waiting on the stalled socket.
+func TestRunCancelUnblocksAStalledLateWrite(t *testing.T) {
+	t.Parallel()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+	var mu sync.Mutex
+	var conns []net.Conn
+	t.Cleanup(func() {
+		_ = ln.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		for _, c := range conns {
+			_ = c.Close()
+		}
+	})
+	// The late sender dials before any worker, so the first connection is
+	// its own: hold it without reading. Drain every later (worker) one.
+	go func() {
+		for first := true; ; first = false {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			conns = append(conns, c)
+			mu.Unlock()
+			if !first {
+				go func() { _, _ = io.Copy(io.Discard, c) }()
+			}
+		}
+	}()
+
+	const (
+		count = 24
+		psize = 4 << 20 // 24 fills of 4 MiB overrun any loopback socket buffering
+	)
+	cfg := Config{
+		Mode: ModeUnicast, Addr: ln.Addr().String(), TCP: true, FrameVersion: 2,
+		Workers: 1, Count: count, PayloadSize: psize, ShardBits: 0,
+	}
+	r := New(cfg, subtree.New(1, []byte("stall")),
+		seq.New(seq.Config{Start: 1, GapEvery: 1, GapSize: 1, GapDelay: time.Millisecond}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := r.Run(ctx)
+		done <- err
+	}()
+
+	// Wait for the regular stream to finish; the late sender is then stuck
+	// on the full socket.
+	deadline := time.Now().Add(60 * time.Second)
+	for r.sent.Load()-r.late.Load() < count {
+		if time.Now().After(deadline) {
+			t.Fatalf("regular stream did not finish: %d of %d sent", r.sent.Load()-r.late.Load(), count)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if r.Late() >= count {
+		t.Fatalf("all %d fills went out: the late socket never stalled, so the test exercises nothing", count)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run still blocked 10s after cancel: a late write to a stalled peer ignored ctx")
 	}
 }
 

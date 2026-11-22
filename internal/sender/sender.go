@@ -288,6 +288,10 @@ func (r *Runner) Run(ctx context.Context) (uint64, error) {
 		go func() {
 			defer lateWG.Done()
 			defer lateEm.close()
+			// A canceled run must not wait on a late write the peer has
+			// stopped reading: interrupt unblocks it without closing.
+			stop := context.AfterFunc(ctx, lateEm.interrupt)
+			defer stop()
 			r.sendLate(ctx, lateEm, lateB, streamDone)
 		}()
 	}
@@ -546,7 +550,22 @@ func (e *emitter) flush() error {
 	return e.tcpW.Flush()
 }
 
-// close drains any buffered TCP tail, then closes the socket.
+// interrupt makes a write blocked on the socket return at once, and every
+// later write fail, without closing it: close flushes, which could block
+// again on a peer that has stopped reading. Safe to call concurrently with a
+// write.
+func (e *emitter) interrupt() {
+	past := time.Unix(1, 0)
+	if e.uconn != nil {
+		_ = e.uconn.SetWriteDeadline(past)
+	}
+	if e.mconn != nil {
+		_ = e.mconn.SetWriteDeadline(past)
+	}
+}
+
+// close drains any buffered TCP tail, then closes the socket. After
+// interrupt the drain fails at once instead of blocking.
 func (e *emitter) close() {
 	if e.tcpW != nil {
 		_ = e.tcpW.Flush()

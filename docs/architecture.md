@@ -146,7 +146,8 @@ reports them as `late=` (a TCP fill counts once flushed). D sets when each fill 
 not when the run ends: when the regular stream ends, the late sender keeps going until the
 queue is empty, so the run lasts until the last fill (due up to D after the last regular
 frame) is built and sent. Canceling the run (SIGINT, SIGTERM) stops the late sender before
-its next fill and interrupts a TxID search. The late sender's socket is opened before the
+its next fill, interrupts a TxID search, and unblocks a write stuck on a peer that stopped
+reading. The late sender's socket is opened before the
 first frame goes out, so a late sender that cannot start fails the run.
 
 The queue is bounded: each worker calls `PerFlowAllocator.Throttle` before taking a SeqNum,
