@@ -27,7 +27,7 @@
 //
 // Usage:
 //
-//	send-block-push -addr [fd00:a::a]:8727 -interval 9m -subtrees 4
+//	send-block-push -addr [2001:db8::a]:8727 -interval 9m -subtrees 4
 package main
 
 import (

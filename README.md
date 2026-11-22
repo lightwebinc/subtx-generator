@@ -23,8 +23,8 @@ proxy stamps them in-place before multicast forwarding.
 - **Subtree ID pool**: N deterministic 32-byte IDs derived from a user
   seed. Same seed ⇒ same IDs across runs, machines, and test scenarios.
 - **Sequence numbers**: shared atomic allocator with optional gap
-  injection (permanent or delayed retransmission) to drive listener-side
-  NACK / retry tests.
+  injection (permanent, or filled late by frames of the same flow) to
+  drive listener-side NACK / retry tests.
 - **Multi-core sender**: one UDP conn per worker, lock-free hot path,
   ticker-paced emission (smooth at ≤ 1 kpps, millisecond bursts above).
 - **Deterministic Subtree pick**: `SubtreeID = pool[uint64(TxID[:8]) % N]`
@@ -54,7 +54,7 @@ make build           # builds every cmd/* binary into the repo root
 
 ```bash
 subtx-gen \
-  -addr [fd20::2]:8725 \
+  -addr [2001:db8::2]:8725 \
   -frame-version 2 \
   -shard-bits 2 \
   -subtrees 8 \

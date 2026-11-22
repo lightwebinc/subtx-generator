@@ -85,7 +85,9 @@ subtx-generator/
 **Sequence allocation:** a shared `seq.Allocator` counts frames across workers with an
 atomic counter. With gap injection, a `seq.PerFlowAllocator` built from the same gap
 settings stamps each frame's SeqNum per `(groupIdx, subtreeID)` flow, as the proxy would;
-every flow starts at 1, whatever `-seq-start` says.
+every flow starts at 1, whatever `-seq-start` says. `-mode=direct-multicast` uses the same
+per-flow allocator (without gaps); either way it is built once, before the workers start,
+and shared by all of them.
 
 **Subtree assignment:** the subtree ID pool is pre-computed from the user seed as
 `pool[i] = SHA256(seed ∥ uint64_be(i))`. Each frame's SubtreeID is selected deterministically:
@@ -129,11 +131,34 @@ sequence numbers every N of its frames. The resulting gap is immediately detecta
 listener (`bsl_gaps_detected_total` rises). A proxy on the path must run with
 `-allow-stamped-ingress`, or it drops the stamped frames.
 
-When `-seq-gap-delay D` is also set, the allocator enqueues the skipped sequence number(s)
-for retransmission after duration D. If the listener has already sent a NACK and the retry
-endpoint has served it, the generator's delayed retransmit may arrive as a duplicate;
-`bsl_gaps_suppressed_total` should rise. If D is zero (the default), the gap is permanent
-and ultimately increments `bsl_gaps_unrecovered_total` on the listener.
+When `-seq-gap-delay D` is also set, the per-flow allocator puts each gap's skipped numbers,
+tagged with their flow, on one queue in due order. A late-sender goroutine with a socket of
+its own sleeps until the oldest entry is due (or a new one is queued), then sends one frame
+per skipped number: a fresh transaction whose TxID shards to the flow's group (about
+2^`-shard-bits` payload builds to find), the flow's SubtreeID, the skipped SeqNum, and in
+`-mode=direct-multicast` the flow's HashKey. The listener sees the frame in the flow whose
+gap it fills and closes the gap; `bsl_gaps_suppressed_total` rises. A retry endpoint holds no
+copy of the skipped frame before the fill passes it, so earlier NACKs for it find nothing to
+retransmit.
+
+Late fills ride outside the pacer and do not count against `-count`; the run's `done:` line
+reports them as `late=` (a TCP fill counts once flushed). D sets when each fill comes due,
+not when the run ends: when the regular stream ends, the late sender keeps going until the
+queue is empty, so the run lasts until the last fill (due up to D after the last regular
+frame) is built and sent. Canceling the run (SIGINT, SIGTERM) stops the late sender before
+its next fill, interrupts a TxID search, and unblocks a write stuck on a peer that stopped
+reading. The late sender's socket is opened before the
+first frame goes out, so a late sender that cannot start fails the run.
+
+The queue is bounded: each worker calls `PerFlowAllocator.Throttle` before taking a SeqNum,
+which waits while more than `seq.DefaultMaxPending` (262144) skipped numbers are queued. A
+late sender that falls behind therefore slows the regular stream instead of growing the
+queue, and no accepted gap is dropped. If D is zero (the default), the gap is permanent and
+ultimately increments `bsl_gaps_unrecovered_total` on the listener.
+
+Gap injection needs `-frame-version 2`; a version 1 header has no SeqNum, so the generator
+refuses the combination at startup (as it does a zero `-seq-gap-size`, a `-seq-gap-delay`
+without `-seq-gap-every`, and a delayed gap larger than the queue bound).
 
 ## BRC-127 SubtreeGroupAnnounce (announce mode)
 

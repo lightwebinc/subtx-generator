@@ -19,7 +19,7 @@
 //
 // Usage:
 //
-//	send-subtree-push -addr [fd00:a::a]:8726 -interval 1s -nodes 16
+//	send-subtree-push -addr [2001:db8::a]:8726 -interval 1s -nodes 16
 package main
 
 import (

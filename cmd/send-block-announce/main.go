@@ -7,7 +7,7 @@
 //
 // Usage:
 //
-//	send-block-announce -addr [fd20::2]:9002 -blocks 5
+//	send-block-announce -addr [2001:db8::2]:9002 -blocks 5
 package main
 
 import (

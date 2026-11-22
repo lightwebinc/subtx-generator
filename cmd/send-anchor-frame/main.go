@@ -7,8 +7,8 @@
 //
 // Usage:
 //
-//	send-anchor-frame -addr [fd20::2]:8725 -count 20
-//	send-anchor-frame -addr [fd20::2]:9002 -tcp -count 20
+//	send-anchor-frame -addr [2001:db8::2]:8725 -count 20
+//	send-anchor-frame -addr [2001:db8::2]:9002 -tcp -count 20
 package main
 
 import (
