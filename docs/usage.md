@@ -164,6 +164,9 @@ The single `gcr.io/distroless/static:nonroot` image carries all seven binaries:
 /usr/local/bin/tunnel-sink           (consumer tunnel delivery sink + submit relay, diagnostic)
 ```
 
+Its license files are in `/usr/share/doc/subtx-generator/`: `LICENSE`,
+`NOTICE` and `LICENSE-THIRD-PARTY`.
+
 Release images are published by a manual workflow dispatch as
 `ghcr.io/lightwebinc/subtx-generator:<tag>`, the git tag without its `v`
 (for example `ghcr.io/lightwebinc/subtx-generator:0.4.4`).
